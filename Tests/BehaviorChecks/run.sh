@@ -26,6 +26,20 @@ swiftc \
   "$BUILD_DIR/SwiftSoup.o" \
   Sources/KHPlayer/Domain/KHError.swift \
   Sources/KHPlayer/Domain/Models.swift \
+  Sources/KHPlayer/Domain/HomeSectionModels.swift \
+  Sources/KHPlayer/Networking/KHRequestBuilder.swift \
+  Sources/KHPlayer/Parsing/HomeSectionParser.swift \
+  Sources/KHPlayer/Persistence/HomeSectionsCache.swift \
+  Tests/BehaviorChecks/HomeSectionsBehaviorChecks.swift \
+  -o /tmp/khinsider-player-home-sections-checks
+
+/tmp/khinsider-player-home-sections-checks
+
+swiftc \
+  -I "$BUILD_DIR" \
+  "$BUILD_DIR/SwiftSoup.o" \
+  Sources/KHPlayer/Domain/KHError.swift \
+  Sources/KHPlayer/Domain/Models.swift \
   Sources/KHPlayer/Parsing/AlbumPageParser.swift \
   Tests/BehaviorChecks/AlbumParserBehaviorChecks.swift \
   -o /tmp/khinsider-player-album-parser-checks
