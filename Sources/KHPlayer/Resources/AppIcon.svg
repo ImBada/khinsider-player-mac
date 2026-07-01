@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <linearGradient id="background" x1="120" y1="92" x2="904" y2="932" gradientUnits="userSpaceOnUse">
+    <linearGradient id="background" x1="72" y1="40" x2="952" y2="984" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#22355f"/>
       <stop offset="0.55" stop-color="#101a37"/>
       <stop offset="1" stop-color="#18204a"/>
@@ -18,21 +18,24 @@
     </filter>
   </defs>
 
-  <rect x="80" y="80" width="864" height="864" rx="196" fill="#162856"/>
-  <rect x="104" y="104" width="816" height="816" rx="172" fill="none" stroke="#3d5cff" stroke-width="18" opacity="0.4"/>
-  <path d="M220 334 L512 166 L804 334 L804 678 L512 846 L220 678 Z" fill="#07101f" opacity="0.8" filter="url(#soft-shadow)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="#162856"/>
+  <rect x="48" y="48" width="928" height="928" rx="204" fill="none" stroke="#3d5cff" stroke-width="22" opacity="0.42"/>
 
-  <path d="M512 198 L762 342 L762 456 L512 312 L262 456 L262 342 Z" fill="url(#diamond-cyan)"/>
-  <path d="M762 456 L762 668 L512 812 L512 600 Z" fill="url(#diamond-magenta)"/>
-  <path d="M262 456 L512 600 L512 812 L262 668 Z" fill="#2032ff"/>
-  <path d="M262 342 L512 486 L762 342 L512 198 Z" fill="#54f0ff" opacity="0.24"/>
+  <g transform="translate(512 512) scale(1.08) translate(-512 -512)">
+    <path d="M220 334 L512 166 L804 334 L804 678 L512 846 L220 678 Z" fill="#07101f" opacity="0.8" filter="url(#soft-shadow)"/>
 
-  <rect x="262" y="456" width="80" height="80" fill="#38e8ff"/>
-  <rect x="682" y="376" width="80" height="80" fill="#ff56d5"/>
-  <rect x="512" y="732" width="80" height="80" fill="#915dff"/>
-  <rect x="432" y="198" width="80" height="80" fill="#49f4ff"/>
+    <path d="M512 198 L762 342 L762 456 L512 312 L262 456 L262 342 Z" fill="url(#diamond-cyan)"/>
+    <path d="M762 456 L762 668 L512 812 L512 600 Z" fill="url(#diamond-magenta)"/>
+    <path d="M262 456 L512 600 L512 812 L262 668 Z" fill="#2032ff"/>
+    <path d="M262 342 L512 486 L762 342 L512 198 Z" fill="#54f0ff" opacity="0.24"/>
 
-  <polygon points="442,382 442,642 656,512" fill="#fbfdff"/>
-  <polygon points="442,382 442,642 656,512" fill="#ffffff" opacity="0.14" transform="translate(14 14)"/>
+    <rect x="262" y="456" width="80" height="80" fill="#38e8ff"/>
+    <rect x="682" y="376" width="80" height="80" fill="#ff56d5"/>
+    <rect x="512" y="732" width="80" height="80" fill="#915dff"/>
+    <rect x="432" y="198" width="80" height="80" fill="#49f4ff"/>
+
+    <polygon points="442,382 442,642 656,512" fill="#fbfdff"/>
+    <polygon points="442,382 442,642 656,512" fill="#ffffff" opacity="0.14" transform="translate(14 14)"/>
+  </g>
 
 </svg>
