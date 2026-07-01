@@ -751,6 +751,30 @@ private struct TrackRow: View {
 
     private var _isLeadingPlayPressed = State<Bool>(initialValue: false)
 
+    fileprivate init(
+        album: AlbumDetail,
+        track: Track,
+        isPlaying: Bool,
+        isSelected: Bool,
+        isHovered: Bool,
+        isFavorite: Bool,
+        onSelect: @escaping () -> Void,
+        onHoverChanged: @escaping (Bool) -> Void,
+        onToggleFavorite: @escaping () -> Void,
+        onPlay: @escaping (AlbumDetail, Track) -> Void
+    ) {
+        self.album = album
+        self.track = track
+        self.isPlaying = isPlaying
+        self.isSelected = isSelected
+        self.isHovered = isHovered
+        self.isFavorite = isFavorite
+        self.onSelect = onSelect
+        self.onHoverChanged = onHoverChanged
+        self.onToggleFavorite = onToggleFavorite
+        self.onPlay = onPlay
+    }
+
     private var isLeadingPlayPressed: Bool {
         get {
             _isLeadingPlayPressed.wrappedValue
