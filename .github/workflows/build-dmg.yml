@@ -1,0 +1,81 @@
+name: Build DMG
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version to embed when running manually"
+        required: false
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg:
+    name: Build macOS DMG
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build app bundle
+        env:
+          CONFIGURATION: debug
+          OUTPUT_DIR: dist
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            APP_VERSION="${GITHUB_REF_NAME#v}"
+          else
+            APP_VERSION="${{ inputs.version || '0.1.0' }}"
+          fi
+
+          VERSION="$APP_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" ./Scripts/package_app.sh
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+
+      - name: Create DMG
+        run: |
+          DMG_ROOT="dist/dmg-root"
+          DMG_PATH="dist/KHInsider-Player-${APP_VERSION}.dmg"
+
+          rm -rf "$DMG_ROOT" "$DMG_PATH"
+          mkdir -p "$DMG_ROOT"
+          cp -R "dist/KHPlayer.app" "$DMG_ROOT/KHInsider Player.app"
+
+          hdiutil create \
+            -volname "KHInsider Player" \
+            -srcfolder "$DMG_ROOT" \
+            -ov \
+            -format UDZO \
+            "$DMG_PATH"
+
+          hdiutil verify "$DMG_PATH"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KHInsider-Player-${{ env.APP_VERSION }}-DMG
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Attach DMG to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+              --title "$GITHUB_REF_NAME" \
+              --notes "Automated KHInsider Player build."
+          fi
