@@ -15,6 +15,7 @@ swift build -c "$CONFIGURATION"
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
 EXECUTABLE_PATH="$BIN_DIR/$APP_NAME"
 RESOURCE_BUNDLE="$BIN_DIR/KHInsiderPlayerMac_KHPlayer.bundle"
+ICON_SOURCE="Sources/KHPlayer/Resources/AppIcon.icns"
 
 if [[ ! -x "$EXECUTABLE_PATH" ]]; then
   echo "Missing built executable: $EXECUTABLE_PATH" >&2
@@ -30,6 +31,10 @@ if [[ -d "$RESOURCE_BUNDLE" ]]; then
   cp -R "$RESOURCE_BUNDLE" "$APP_PATH/Contents/Resources/"
 fi
 
+if [[ -f "$ICON_SOURCE" ]]; then
+  cp "$ICON_SOURCE" "$APP_PATH/Contents/Resources/AppIcon.icns"
+fi
+
 cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -43,6 +48,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
