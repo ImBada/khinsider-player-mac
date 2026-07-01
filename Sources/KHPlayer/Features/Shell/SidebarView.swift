@@ -54,6 +54,9 @@ internal enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
 }
 
 internal struct SidebarView: View {
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.openURL) private var openURL
+
     @Binding private var selection: SidebarDestination?
     private var _isFavoritesExpanded = State<Bool>(initialValue: true)
 
@@ -96,5 +99,34 @@ internal struct SidebarView: View {
         .navigationSplitViewColumnWidth(min: SidebarLayout.minimumWidth, ideal: SidebarLayout.idealWidth)
         .background(SidebarSplitCollapseGuard(minimumThickness: SidebarLayout.minimumWidth))
         .toolbar(removing: .sidebarToggle)
+        .overlay(alignment: .bottomTrailing) {
+            if let updateAvailability = appState.updateAvailability {
+                SidebarUpdateButton {
+                    openURL(updateAvailability.releaseURL)
+                }
+                .padding(.trailing, 14)
+                .padding(.bottom, 14)
+            }
+        }
+    }
+}
+
+private struct SidebarUpdateButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Update", systemImage: "arrow.down.circle.fill")
+                .labelStyle(.titleAndIcon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .background(Color.accentColor, in: Capsule(style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+        .help("Open the latest GitHub release")
     }
 }

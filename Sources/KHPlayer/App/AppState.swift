@@ -10,14 +10,18 @@ internal final class AppState: ObservableObject {
     internal let libraryStore: LibraryStore
     internal let artworkCache: ArtworkCache
     internal let searchViewModel: SearchViewModel
+    internal let releaseChecker: GitHubReleaseChecker
 
     @Published internal private(set) var cacheLimitBytes: Int64 = 256 * 1024 * 1024
     @Published internal private(set) var playbackEngine: PlaybackEngine
+    @Published internal private(set) var updateAvailability: UpdateAvailability?
 
     private var activeTrackCache: ActiveTrackCache
+    private var hasCheckedForUpdates = false
 
     internal init() throws {
         let client = KHClient()
+        let releaseChecker = GitHubReleaseChecker()
         let streamResolver = StreamResolver(client: client)
         let libraryStore = try LibraryStore.appStore()
         let artworkCache = try ArtworkCache.appCache()
@@ -30,8 +34,26 @@ internal final class AppState: ObservableObject {
         self.libraryStore = libraryStore
         self.artworkCache = artworkCache
         self.searchViewModel = SearchViewModel(client: client)
+        self.releaseChecker = releaseChecker
         self.activeTrackCache = cache
         self.playbackEngine = playbackEngine
+    }
+
+    internal func checkForUpdatesIfNeeded() async {
+        guard !hasCheckedForUpdates else {
+            return
+        }
+
+        hasCheckedForUpdates = true
+
+        do {
+            let availability = try await releaseChecker.updateAvailability(
+                currentVersion: Self.currentAppVersion()
+            )
+            updateAvailability = availability.isUpdateAvailable ? availability : nil
+        } catch {
+            updateAvailability = nil
+        }
     }
 
     internal func setCacheLimitBytes(_ limitBytes: Int64) async throws {
@@ -68,5 +90,9 @@ internal final class AppState: ObservableObject {
         return cachesURL
             .appendingPathComponent("com.bada.khinsider-player-mac", isDirectory: true)
             .appendingPathComponent("ActiveTrackCache", isDirectory: true)
+    }
+
+    private static func currentAppVersion() -> String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     }
 }

@@ -30,6 +30,10 @@ internal struct AppContentView: View {
         ContentView()
             .environment(\.appState, appState)
             .environmentObject(appState)
+            .task {
+                try? await Task.sleep(for: .seconds(1))
+                await appState.checkForUpdatesIfNeeded()
+            }
     }
 }
 
