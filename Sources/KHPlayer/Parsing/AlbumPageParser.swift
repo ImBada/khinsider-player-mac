@@ -16,22 +16,22 @@ internal enum AlbumPageParser {
         }
 
         let metadataParagraph = try metadataParagraph(in: document)
-        let metadataLines = try metadataParagraph.map {
-            try metadataLines(in: $0, baseURL: url)
+        let parsedMetadataLines = try metadataParagraph.map {
+            try Self.metadataLines(in: $0, baseURL: url)
         } ?? []
         return AlbumDetail(
             id: albumID,
             title: title,
             url: url,
             alternativeTitles: try alternativeTitles(in: document, baseURL: url),
-            platforms: try platforms(in: metadataLines, baseURL: url),
-            year: intValue(label: "Year", in: metadataLines),
-            publisher: metadataValue(label: "Published by", in: metadataLines),
-            albumType: metadataValue(label: "Album type", in: metadataLines),
-            fileCount: intValue(label: "Number of Files", in: metadataLines),
+            platforms: try platforms(in: parsedMetadataLines, baseURL: url),
+            year: intValue(label: "Year", in: parsedMetadataLines),
+            publisher: metadataValue(label: "Published by", in: parsedMetadataLines),
+            albumType: metadataValue(label: "Album type", in: parsedMetadataLines),
+            fileCount: intValue(label: "Number of Files", in: parsedMetadataLines),
             totalDuration: try totalDuration(in: document),
-            totalMP3Size: totalMP3Size(in: metadataLines),
-            dateAdded: metadataValue(label: "Date Added", in: metadataLines),
+            totalMP3Size: totalMP3Size(in: parsedMetadataLines),
+            dateAdded: metadataValue(label: "Date Added", in: parsedMetadataLines),
             artworkURL: try artworkURL(in: document, baseURL: url),
             description: try description(in: document),
             tracks: try tracks(in: document, albumID: albumID, baseURL: url)
@@ -187,8 +187,8 @@ private extension AlbumPageParser {
         let discNumber = try discNumberBeforeTitle(in: cells, titleIndex: titleInfo.index)
 
         let cellsAfterTitle = cells.dropFirst(titleInfo.index + 1)
-        let duration = try cellsAfterTitle.lazy.compactMap { cell in
-            try duration(from: trimmedText(from: cell))
+        let trackDuration = try cellsAfterTitle.lazy.compactMap { cell in
+            try Self.duration(from: trimmedText(from: cell))
         }.first
         let sizes = try cellsAfterTitle.compactMap { cell in
             try sizeLabel(from: trimmedText(from: cell))
@@ -201,7 +201,7 @@ private extension AlbumPageParser {
             number: number,
             title: titleInfo.title,
             detailURL: detailURL,
-            duration: duration,
+            duration: trackDuration,
             mp3Size: sizes.first
         )
     }

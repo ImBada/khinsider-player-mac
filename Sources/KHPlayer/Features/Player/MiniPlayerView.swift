@@ -270,6 +270,20 @@ private struct MiniPlayerTrackInfo: View {
     @Namespace private var playbackFaderAnimation
     private var _isPlaybackFaderHovered = State<Bool>(initialValue: false)
 
+    fileprivate init(
+        trackTitle: String,
+        albumTitle: String?,
+        elapsedTime: TimeInterval,
+        duration: TimeInterval,
+        onSeek: @escaping (Double) -> Void
+    ) {
+        self.trackTitle = trackTitle
+        self.albumTitle = albumTitle
+        self.elapsedTime = elapsedTime
+        self.duration = duration
+        self.onSeek = onSeek
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             if isPlaybackFaderHovered {
@@ -395,6 +409,11 @@ private struct MiniPlayerVolumeControl: View {
     @Binding var isPresented: Bool
 
     private var _volumeBeforeMute = State<Double>(initialValue: 1)
+
+    fileprivate init(volume: Binding<Double>, isPresented: Binding<Bool>) {
+        self._volume = volume
+        self._isPresented = isPresented
+    }
 
     var body: some View {
         Group {

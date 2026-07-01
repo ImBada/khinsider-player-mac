@@ -380,6 +380,10 @@ private struct AlbumResultRow: View {
 
     private var _isHovered = State<Bool>(initialValue: false)
 
+    fileprivate init(album: AlbumSummary) {
+        self.album = album
+    }
+
     private var isHovered: Bool {
         get {
             _isHovered.wrappedValue
@@ -481,6 +485,11 @@ private struct HomeAlbumSectionRow: View {
 
     private var _scrollIndex = State<Int>(initialValue: 0)
     private var _isHovered = State<Bool>(initialValue: false)
+
+    fileprivate init(section: HomeSection, onOpenAlbum: @escaping (AlbumSummary) -> Void) {
+        self.section = section
+        self.onOpenAlbum = onOpenAlbum
+    }
 
     private var scrollIndex: Int {
         get {
