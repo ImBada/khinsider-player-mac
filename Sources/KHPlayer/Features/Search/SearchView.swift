@@ -25,6 +25,9 @@ internal struct SearchView: View {
             floatingSearchHeader
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            await viewModel.loadHomeSectionsIfNeeded()
+        }
     }
 
     private var trimmedQuery: String {
@@ -126,7 +129,11 @@ internal struct SearchView: View {
         } else if let errorMessage = viewModel.errorMessage {
             errorState(message: errorMessage)
         } else if viewModel.results.isEmpty {
-            emptyState
+            if trimmedQuery.isEmpty {
+                homeContent
+            } else {
+                emptyState
+            }
         } else {
             resultsList
         }
@@ -159,22 +166,65 @@ internal struct SearchView: View {
     }
 
     private var emptyState: some View {
-        Group {
-            if trimmedQuery.isEmpty {
-                ContentUnavailableView(
-                    "Search KHInsider Albums",
-                    systemImage: "magnifyingglass",
-                    description: Text("Album results will appear here.")
-                )
-            } else {
-                ContentUnavailableView(
-                    "No Albums Found",
-                    systemImage: "music.note.list",
-                    description: Text("Try a different album title.")
-                )
-            }
-        }
+        ContentUnavailableView(
+            "No Albums Found",
+            systemImage: "music.note.list",
+            description: Text("Try a different album title.")
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var homeContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: HomeSectionLayout.sectionSpacing) {
+                Color.clear
+                    .frame(height: SearchChromeMetrics.contentTopInset)
+                    .accessibilityHidden(true)
+
+                if viewModel.homeSections.isEmpty {
+                    homeLoadingOrError
+                        .frame(maxWidth: .infinity, minHeight: HomeSectionLayout.emptyStateMinHeight)
+                } else {
+                    ForEach(viewModel.homeSections) { section in
+                        HomeAlbumSectionRow(section: section, onOpenAlbum: onOpenAlbum)
+                    }
+                }
+            }
+            .padding(.horizontal, HomeSectionLayout.horizontalPadding)
+            .padding(.bottom, HomeSectionLayout.bottomPadding)
+        }
+        .scrollIndicators(.visible)
+    }
+
+    @ViewBuilder
+    private var homeLoadingOrError: some View {
+        if viewModel.isLoadingHomeSections {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+
+                Text("Loading Home")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        } else if let homeErrorMessage = viewModel.homeErrorMessage {
+            ContentUnavailableView {
+                Label("Home Unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(homeErrorMessage)
+            } actions: {
+                Button {
+                    Task {
+                        await viewModel.loadHomeSectionsIfNeeded(forceRefresh: true)
+                    }
+                } label: {
+                    Label("Try Again", systemImage: "arrow.clockwise")
+                }
+            }
+            .textSelection(.enabled)
+        } else {
+            EmptyView()
+        }
     }
 
     private var resultsList: some View {
@@ -243,6 +293,23 @@ internal enum SearchChromeMetrics {
 
 internal enum SearchResultRowMetrics {
     internal static let cornerRadius: CGFloat = 7
+}
+
+internal enum HomeSectionLayout {
+    internal static let horizontalPadding: CGFloat = 32
+    internal static let sectionSpacing: CGFloat = 34
+    internal static let headerBottomPadding: CGFloat = 12
+    internal static let cardSpacing: CGFloat = 24
+    internal static let artworkSize: CGFloat = 174
+    internal static let artworkCornerRadius: CGFloat = 8
+    internal static let cardWidth: CGFloat = 174
+    internal static let cardHeight: CGFloat = 268
+    internal static let jumpButtonWidth: CGFloat = 40
+    internal static let jumpButtonHeight: CGFloat = 68
+    internal static let jumpButtonHorizontalOffset: CGFloat = 12
+    internal static let jumpStride: Int = 5
+    internal static let bottomPadding: CGFloat = 92
+    internal static let emptyStateMinHeight: CGFloat = 280
 }
 
 private struct SearchChromeDragArea: NSViewRepresentable {
@@ -402,6 +469,300 @@ private struct AlbumResultRow: View {
 
         if !album.platforms.isEmpty {
             parts.append(album.platforms.joined(separator: ", "))
+        }
+
+        return parts.joined(separator: " - ")
+    }
+}
+
+private struct HomeAlbumSectionRow: View {
+    let section: HomeSection
+    let onOpenAlbum: (AlbumSummary) -> Void
+
+    private var _scrollIndex = State<Int>(initialValue: 0)
+    private var _isHovered = State<Bool>(initialValue: false)
+
+    private var scrollIndex: Int {
+        get {
+            _scrollIndex.wrappedValue
+        }
+        nonmutating set {
+            _scrollIndex.wrappedValue = newValue
+        }
+    }
+
+    private var isHovered: Bool {
+        get {
+            _isHovered.wrappedValue
+        }
+        nonmutating set {
+            _isHovered.wrappedValue = newValue
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(section.source.title)
+                .font(.title3.weight(.bold))
+                .padding(.bottom, HomeSectionLayout.headerBottomPadding)
+
+            ScrollViewReader { proxy in
+                ZStack {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .top, spacing: HomeSectionLayout.cardSpacing) {
+                            ForEach(displayedAlbums) { album in
+                                Button {
+                                    onOpenAlbum(album)
+                                } label: {
+                                    HomeAlbumCard(album: album)
+                                }
+                                .buttonStyle(.plain)
+                                .id(album.id)
+                            }
+                        }
+                        .padding(.trailing, HomeSectionLayout.horizontalPadding)
+                    }
+                    .scrollIndicators(.hidden)
+                    .background {
+                        HomeHorizontalScrollIndicatorHider()
+                    }
+
+                    jumpControls(proxy: proxy)
+                }
+            }
+            .frame(height: HomeSectionLayout.cardHeight)
+        }
+        .onHover { isHovered in
+            self.isHovered = isHovered
+        }
+        .onDisappear {
+            isHovered = false
+        }
+    }
+
+    private var displayedAlbums: [AlbumSummary] {
+        Array(section.albums.prefix(20))
+    }
+
+    @ViewBuilder
+    private func jumpControls(proxy: ScrollViewProxy) -> some View {
+        if displayedAlbums.count > 1 {
+            HStack {
+                if scrollIndex > 0 {
+                    HomeAlbumSectionJumpButton(direction: .backward) {
+                        jump(by: -HomeSectionLayout.jumpStride, proxy: proxy)
+                    }
+                    .transition(.opacity)
+                }
+
+                Spacer(minLength: 0)
+
+                if scrollIndex < displayedAlbums.count - 1 {
+                    HomeAlbumSectionJumpButton(direction: .forward) {
+                        jump(by: HomeSectionLayout.jumpStride, proxy: proxy)
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .padding(.horizontal, HomeSectionLayout.jumpButtonHorizontalOffset)
+            .opacity(isHovered ? 1 : 0)
+            .animation(.easeInOut(duration: 0.16), value: scrollIndex)
+            .animation(.easeInOut(duration: 0.12), value: isHovered)
+            .allowsHitTesting(true)
+            .frame(height: HomeSectionLayout.artworkSize, alignment: .center)
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func jump(by stride: Int, proxy: ScrollViewProxy) {
+        guard !displayedAlbums.isEmpty else {
+            return
+        }
+
+        let targetIndex = min(max(scrollIndex + stride, 0), displayedAlbums.count - 1)
+        let targetAlbumID = displayedAlbums[targetIndex].id
+        scrollIndex = targetIndex
+
+        withAnimation(.easeInOut(duration: 0.28)) {
+            proxy.scrollTo(targetAlbumID, anchor: targetIndex == 0 ? .leading : .center)
+        }
+    }
+}
+
+private enum HomeAlbumSectionJumpDirection {
+    case backward
+    case forward
+
+    var systemImage: String {
+        switch self {
+        case .backward:
+            "chevron.left"
+        case .forward:
+            "chevron.right"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .backward:
+            "Previous albums"
+        case .forward:
+            "Next albums"
+        }
+    }
+}
+
+private struct HomeAlbumSectionJumpButton: View {
+    let direction: HomeAlbumSectionJumpDirection
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: direction.systemImage)
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(AdaptiveSystemColors.selectedText)
+                .frame(
+                    width: HomeSectionLayout.jumpButtonWidth,
+                    height: HomeSectionLayout.jumpButtonHeight
+                )
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(AdaptiveSystemColors.subtleSelection), in: Capsule(style: .continuous))
+        .shadow(color: AdaptiveSystemColors.shadow.opacity(0.26), radius: 14, y: 6)
+        .accessibilityLabel(direction.accessibilityLabel)
+    }
+}
+
+private struct HomeHorizontalScrollIndicatorHider: NSViewRepresentable {
+    func makeNSView(context: Context) -> IndicatorHiderView {
+        IndicatorHiderView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: IndicatorHiderView, context: Context) {
+        nsView.hideHorizontalScrollers()
+    }
+
+    final class IndicatorHiderView: NSView {
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            hideHorizontalScrollers()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            hideHorizontalScrollers()
+        }
+
+        override func layout() {
+            super.layout()
+            hideHorizontalScrollers()
+        }
+
+        func hideHorizontalScrollers() {
+            DispatchQueue.main.async { [weak self] in
+                self?.hideHorizontalScrollersNow()
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.hideHorizontalScrollersNow()
+            }
+        }
+
+        private func hideHorizontalScrollersNow() {
+            guard let rootView = window?.contentView else {
+                return
+            }
+
+            hideHorizontalScrollers(in: rootView)
+        }
+
+        private func hideHorizontalScrollers(in view: NSView) {
+            if let scrollView = view as? NSScrollView {
+                scrollView.hasHorizontalScroller = false
+                scrollView.horizontalScroller = nil
+                scrollView.autohidesScrollers = true
+            }
+
+            for subview in view.subviews {
+                hideHorizontalScrollers(in: subview)
+            }
+        }
+    }
+}
+
+private struct HomeAlbumCard: View {
+    let album: AlbumSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            artwork
+
+            Text(album.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !metadata.isEmpty {
+                Text(metadata)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: HomeSectionLayout.cardWidth, height: HomeSectionLayout.cardHeight, alignment: .topLeading)
+        .contentShape(Rectangle())
+    }
+
+    private var artwork: some View {
+        AsyncImage(url: album.artworkURL) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .empty, .failure:
+                artworkPlaceholder
+            @unknown default:
+                artworkPlaceholder
+            }
+        }
+        .frame(width: HomeSectionLayout.artworkSize, height: HomeSectionLayout.artworkSize)
+        .background(.quaternary)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: HomeSectionLayout.artworkCornerRadius,
+                style: .continuous
+            )
+        )
+    }
+
+    private var artworkPlaceholder: some View {
+        ZStack {
+            RoundedRectangle(
+                cornerRadius: HomeSectionLayout.artworkCornerRadius,
+                style: .continuous
+            )
+            .fill(.quaternary)
+
+            Image(systemName: "music.note")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var metadata: String {
+        var parts: [String] = []
+
+        if let year = album.year {
+            parts.append(String(year))
+        }
+
+        if !album.platforms.isEmpty {
+            parts.append(album.platforms.prefix(2).joined(separator: ", "))
+        } else if let albumType = album.albumType, !albumType.isEmpty {
+            parts.append(albumType)
         }
 
         return parts.joined(separator: " - ")
