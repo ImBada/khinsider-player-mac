@@ -189,6 +189,8 @@ internal struct SearchView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            searchResultsBottomSpacer
         }
         .listStyle(.inset)
     }
@@ -196,6 +198,14 @@ internal struct SearchView: View {
     private var searchResultsTopSpacer: some View {
         Color.clear
             .frame(height: SearchChromeMetrics.contentTopInset)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .accessibilityHidden(true)
+    }
+
+    private var searchResultsBottomSpacer: some View {
+        Color.clear
+            .frame(height: SearchChromeMetrics.contentBottomInset)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .accessibilityHidden(true)
@@ -210,6 +220,7 @@ internal struct SearchView: View {
 
 internal enum SearchChromeMetrics {
     internal static let contentTopInset: CGFloat = 72
+    internal static let contentBottomInset: CGFloat = 92
     internal static let headerTopPadding: CGFloat = 12
     internal static let outerHorizontalPadding: CGFloat = 28
     internal static let headerHorizontalPadding: CGFloat = 14
