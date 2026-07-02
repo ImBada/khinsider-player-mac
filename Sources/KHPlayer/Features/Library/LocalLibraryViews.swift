@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 internal struct HistoryView: View {
@@ -9,6 +10,7 @@ internal struct HistoryView: View {
     private var _entries = State<[HistoryEntry]>(initialValue: [])
     private var _hoveredHistoryTrackID = State<String?>(initialValue: nil)
     private var _selectedHistoryTrackID = State<String?>(initialValue: nil)
+    private var _currentPlaybackTrackID = State<String?>(initialValue: nil)
     private var _historySearchText = State<String>(initialValue: "")
     private var _isLoading = State<Bool>(initialValue: true)
     private var _errorMessage = State<String?>(initialValue: nil)
@@ -35,6 +37,9 @@ internal struct HistoryView: View {
         .task {
             loadHistory()
         }
+        .onReceive(currentPlaybackTrackIDPublisher) { trackID in
+            currentPlaybackTrackID = trackID
+        }
     }
 
     @ViewBuilder
@@ -55,7 +60,7 @@ internal struct HistoryView: View {
             entries: filteredEntries,
             hoveredTrackID: hoveredHistoryTrackID,
             selectedTrackID: selectedHistoryTrackIDBinding,
-            playbackEngine: appState.playbackEngine,
+            currentPlaybackTrackID: currentPlaybackTrackID,
             onHoverTrackChanged: { entry, isHovered in
                 updateHistoryTrackHover(for: entry, isHovered: isHovered)
             },
@@ -122,6 +127,22 @@ internal struct HistoryView: View {
 
     private var selectedHistoryTrackIDBinding: Binding<String?> {
         _selectedHistoryTrackID.projectedValue
+    }
+
+    private var currentPlaybackTrackID: String? {
+        get {
+            _currentPlaybackTrackID.wrappedValue
+        }
+        nonmutating set {
+            _currentPlaybackTrackID.wrappedValue = newValue
+        }
+    }
+
+    private var currentPlaybackTrackIDPublisher: AnyPublisher<String?, Never> {
+        appState.playbackEngine.$currentItem
+            .map { item in item?.track.id }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 
     private var historySearchText: String {
@@ -224,6 +245,7 @@ internal struct FavoritesView: View {
     private var _hoveredFavoriteAlbumID = State<String?>(initialValue: nil)
     private var _hoveredFavoriteTrackID = State<String?>(initialValue: nil)
     private var _selectedFavoriteTrackID = State<String?>(initialValue: nil)
+    private var _currentPlaybackTrackID = State<String?>(initialValue: nil)
     private var _favoriteSearchText = State<String>(initialValue: "")
     private var _isLoading = State<Bool>(initialValue: true)
     private var _errorMessage = State<String?>(initialValue: nil)
@@ -255,6 +277,9 @@ internal struct FavoritesView: View {
         .navigationTitle("Favorites")
         .task {
             loadFavorites()
+        }
+        .onReceive(currentPlaybackTrackIDPublisher) { trackID in
+            currentPlaybackTrackID = trackID
         }
     }
 
@@ -320,7 +345,7 @@ internal struct FavoritesView: View {
                 tracks: filteredTracks,
                 hoveredTrackID: hoveredFavoriteTrackID,
                 selectedTrackID: selectedFavoriteTrackIDBinding,
-                playbackEngine: appState.playbackEngine,
+                currentPlaybackTrackID: currentPlaybackTrackID,
                 onHoverTrackChanged: { track, isHovered in
                     updateFavoriteTrackHover(for: track, isHovered: isHovered)
                 },
@@ -420,6 +445,22 @@ internal struct FavoritesView: View {
         nonmutating set {
             _hoveredFavoriteTrackID.wrappedValue = newValue
         }
+    }
+
+    private var currentPlaybackTrackID: String? {
+        get {
+            _currentPlaybackTrackID.wrappedValue
+        }
+        nonmutating set {
+            _currentPlaybackTrackID.wrappedValue = newValue
+        }
+    }
+
+    private var currentPlaybackTrackIDPublisher: AnyPublisher<String?, Never> {
+        appState.playbackEngine.$currentItem
+            .map { item in item?.track.id }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 
     private var selectedFavoriteTrackIDBinding: Binding<String?> {
@@ -672,25 +713,24 @@ private struct HistorySongsTable: View {
     let entries: [HistoryEntry]
     let hoveredTrackID: String?
     let selectedTrackID: Binding<String?>
+    let currentPlaybackTrackID: String?
     let onHoverTrackChanged: (HistoryEntry, Bool) -> Void
     let onPlayTrack: (HistoryEntry) -> Void
-
-    @ObservedObject private var playbackEngine: PlaybackEngine
 
     init(
         entries: [HistoryEntry],
         hoveredTrackID: String?,
         selectedTrackID: Binding<String?>,
-        playbackEngine: PlaybackEngine,
+        currentPlaybackTrackID: String?,
         onHoverTrackChanged: @escaping (HistoryEntry, Bool) -> Void,
         onPlayTrack: @escaping (HistoryEntry) -> Void
     ) {
         self.entries = entries
         self.hoveredTrackID = hoveredTrackID
         self.selectedTrackID = selectedTrackID
+        self.currentPlaybackTrackID = currentPlaybackTrackID
         self.onHoverTrackChanged = onHoverTrackChanged
         self.onPlayTrack = onPlayTrack
-        _playbackEngine = ObservedObject(wrappedValue: playbackEngine)
     }
 
     var body: some View {
@@ -699,7 +739,7 @@ private struct HistorySongsTable: View {
                 HistorySongTitleCell(
                     entry: entry,
                     isHovered: hoveredTrackID == entry.id,
-                    isPlaying: playbackEngine.currentItem?.track.id == entry.id,
+                    isPlaying: currentPlaybackTrackID == entry.id,
                     onHoverChanged: { isHovered in
                         onHoverTrackChanged(entry, isHovered)
                     },
@@ -816,25 +856,24 @@ private struct FavoriteSongsTable: View {
     let tracks: [FavoriteTrackEntry]
     let hoveredTrackID: String?
     let selectedTrackID: Binding<String?>
+    let currentPlaybackTrackID: String?
     let onHoverTrackChanged: (FavoriteTrackEntry, Bool) -> Void
     let onPlayTrack: (FavoriteTrackEntry) -> Void
-
-    @ObservedObject private var playbackEngine: PlaybackEngine
 
     init(
         tracks: [FavoriteTrackEntry],
         hoveredTrackID: String?,
         selectedTrackID: Binding<String?>,
-        playbackEngine: PlaybackEngine,
+        currentPlaybackTrackID: String?,
         onHoverTrackChanged: @escaping (FavoriteTrackEntry, Bool) -> Void,
         onPlayTrack: @escaping (FavoriteTrackEntry) -> Void
     ) {
         self.tracks = tracks
         self.hoveredTrackID = hoveredTrackID
         self.selectedTrackID = selectedTrackID
+        self.currentPlaybackTrackID = currentPlaybackTrackID
         self.onHoverTrackChanged = onHoverTrackChanged
         self.onPlayTrack = onPlayTrack
-        _playbackEngine = ObservedObject(wrappedValue: playbackEngine)
     }
 
     var body: some View {
@@ -843,7 +882,7 @@ private struct FavoriteSongsTable: View {
                 FavoriteSongTitleCell(
                     entry: entry,
                     isHovered: hoveredTrackID == entry.id,
-                    isPlaying: playbackEngine.currentItem?.track.id == entry.id,
+                    isPlaying: currentPlaybackTrackID == entry.id,
                     onHoverChanged: { isHovered in
                         onHoverTrackChanged(entry, isHovered)
                     },
