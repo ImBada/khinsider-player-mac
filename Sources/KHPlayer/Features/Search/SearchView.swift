@@ -179,6 +179,12 @@ internal struct SearchView: View {
             VStack(alignment: .leading, spacing: HomeSectionLayout.sectionSpacing) {
                 Color.clear
                     .frame(height: SearchChromeMetrics.contentTopInset)
+                    .background {
+                        SearchScrollIndicatorInsetsSetter(
+                            scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset,
+                            contentTop: SearchChromeMetrics.contentTopInset
+                        )
+                    }
                     .accessibilityHidden(true)
 
                 if viewModel.homeSections.isEmpty {
@@ -248,6 +254,12 @@ internal struct SearchView: View {
     private var searchResultsTopSpacer: some View {
         Color.clear
             .frame(height: SearchChromeMetrics.contentTopInset)
+            .background {
+                SearchScrollIndicatorInsetsSetter(
+                    scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset,
+                    contentTop: SearchChromeMetrics.contentTopInset
+                )
+            }
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             .accessibilityHidden(true)
@@ -270,6 +282,7 @@ internal struct SearchView: View {
 
 internal enum SearchChromeMetrics {
     internal static let contentTopInset: CGFloat = 72
+    internal static let scrollIndicatorTopInset = contentTopInset - headerTopPadding
     internal static let contentBottomInset: CGFloat = 92
     internal static let headerTopPadding: CGFloat = 12
     internal static let outerHorizontalPadding: CGFloat = 28
@@ -311,6 +324,68 @@ internal enum HomeSectionLayout {
     internal static let jumpStride: Int = 5
     internal static let bottomPadding: CGFloat = 92
     internal static let emptyStateMinHeight: CGFloat = 280
+}
+
+private struct SearchScrollIndicatorInsetsSetter: NSViewRepresentable {
+    let scrollerTop: CGFloat
+    let contentTop: CGFloat
+
+    func makeNSView(context: Context) -> ScrollIndicatorInsetsView {
+        ScrollIndicatorInsetsView(scrollerTop: scrollerTop, contentTop: contentTop)
+    }
+
+    func updateNSView(_ nsView: ScrollIndicatorInsetsView, context: Context) {
+        nsView.scrollerTop = scrollerTop
+        nsView.contentTop = contentTop
+        nsView.updateScrollIndicatorInsets()
+    }
+
+    final class ScrollIndicatorInsetsView: NSView {
+        var scrollerTop: CGFloat
+        var contentTop: CGFloat
+
+        init(scrollerTop: CGFloat, contentTop: CGFloat) {
+            self.scrollerTop = scrollerTop
+            self.contentTop = contentTop
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) {
+            nil
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            updateScrollIndicatorInsets()
+        }
+
+        override func layout() {
+            super.layout()
+            updateScrollIndicatorInsets()
+        }
+
+        func updateScrollIndicatorInsets() {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateScrollIndicatorInsetsNow()
+            }
+        }
+
+        private func updateScrollIndicatorInsetsNow() {
+            guard let searchScrollView = enclosingScrollView else {
+                return
+            }
+
+            var scrollerInsets = searchScrollView.scrollerInsets
+            scrollerInsets.top = scrollerTop
+            searchScrollView.scrollerInsets = scrollerInsets
+
+            var contentInsets = searchScrollView.contentInsets
+            contentInsets.top = contentTop
+            searchScrollView.contentInsets = contentInsets
+
+            searchScrollView.tile()
+        }
+    }
 }
 
 private struct SearchChromeDragArea: NSViewRepresentable {
