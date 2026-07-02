@@ -169,6 +169,7 @@ struct DesignBehaviorChecks {
         precondition(!source.contains("VStack(spacing: 0) {\n                    ScrollOffsetObserver { offsetY in"))
         precondition(source.contains("scrollOffsetY = offsetY"))
         precondition(source.contains("collapsedTopBar(album: album, isVisible: shouldShowCollapsedTopBar)"))
+        precondition(source.contains("albumTopBarDragArea(isVisible: shouldShowCollapsedTopBar)"))
         precondition(source.contains("private var shouldShowCollapsedTopBar: Bool"))
         precondition(source.contains("scrollOffsetY >= AlbumDetailLayout.metadataLineCollapseOffset"))
         precondition(source.contains("private struct ScrollOffsetObserver: NSViewRepresentable"))
@@ -181,8 +182,15 @@ struct DesignBehaviorChecks {
         precondition(source.contains("findScrollView(in view: NSView)"))
         precondition(source.contains(".opacity(isVisible ? 1 : 0)"))
         precondition(source.contains(".zIndex(AlbumDetailLayout.collapsedTopBarZIndex)"))
+        precondition(source.contains(".zIndex(AlbumDetailLayout.topBarDragAreaZIndex)"))
         precondition(source.contains("AlbumTopControls("))
         precondition(source.contains("albumURL: album.url"))
+        precondition(source.contains("private struct AlbumTopBarDragArea: NSViewRepresentable"))
+        precondition(source.contains("AlbumTopBarDragArea(isVisible: isVisible)"))
+        precondition(source.contains("window?.performDrag(with: event)"))
+        precondition(source.contains("controlExclusionRects.contains { rect in"))
+        precondition(source.contains("static let topBarDragAreaZIndex: Double = 15"))
+        precondition(source.contains("static let topControlHorizontalPadding: CGFloat = 22"))
     }
 
     private static func checkAppWindowDoesNotRenderPersistentTitleBar() throws {
