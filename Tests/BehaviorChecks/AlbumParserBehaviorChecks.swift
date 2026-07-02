@@ -5,6 +5,7 @@ struct AlbumParserBehaviorChecks {
     static func main() throws {
         try checkTrackRowsUseTrackNumberColumnAndUniqueIDs()
         try checkTrackRowsCaptureDiscNumberColumn()
+        try checkNonASCIIAlbumSlugPreservesEncodedTrackHref()
     }
 
     private static func checkTrackRowsUseTrackNumberColumnAndUniqueIDs() throws {
@@ -98,5 +99,41 @@ struct AlbumParserBehaviorChecks {
 
         precondition(album.tracks.map(\.discNumber) == [1, 2])
         precondition(album.tracks.map(\.number) == [37, 1])
+    }
+
+    private static func checkNonASCIIAlbumSlugPreservesEncodedTrackHref() throws {
+        let html = """
+        <html>
+        <body>
+        <h2>Pokemon Legends: Z-A</h2>
+        <table id="songlist">
+            <tr id="songlist_header">
+                <th>&nbsp;</th>
+                <th>CD</th>
+                <th>#</th>
+                <th colspan="2">Song Name</th>
+                <th>MP3</th>
+            </tr>
+            <tr>
+                <td align="center" title="play track"></td>
+                <td align="center">1</td>
+                <td align="right">4.</td>
+                <td class="clickable-row"><a href="/game-soundtracks/album/pok\u{00e9}mon-legends-za-switch-switch-2-gamerip-2025/1-04.%2520Pok%25C3%25A9mon%2520Legends%2520-%2520Z-A.mp3">Pokemon Legends - Z-A</a></td>
+                <td class="clickable-row" align="right"><a href="/game-soundtracks/album/pok\u{00e9}mon-legends-za-switch-switch-2-gamerip-2025/1-04.%2520Pok%25C3%25A9mon%2520Legends%2520-%2520Z-A.mp3">0:18</a></td>
+                <td class="clickable-row" align="right"><a href="/game-soundtracks/album/pok\u{00e9}mon-legends-za-switch-switch-2-gamerip-2025/1-04.%2520Pok%25C3%25A9mon%2520Legends%2520-%2520Z-A.mp3">0.56 MB</a></td>
+            </tr>
+        </table>
+        </body>
+        </html>
+        """
+
+        let url = URL(string: "https://downloads.khinsider.com/game-soundtracks/album/pok%C3%A9mon-legends-za-switch-switch-2-gamerip-2025")!
+        let album = try AlbumPageParser.parse(html: html, url: url)
+
+        precondition(album.tracks.count == 1)
+        precondition(
+            album.tracks[0].detailURL.absoluteString ==
+            "https://downloads.khinsider.com/game-soundtracks/album/pok%C3%A9mon-legends-za-switch-switch-2-gamerip-2025/1-04.%2520Pok%25C3%25A9mon%2520Legends%2520-%2520Z-A.mp3"
+        )
     }
 }

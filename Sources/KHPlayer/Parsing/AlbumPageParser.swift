@@ -417,17 +417,107 @@ private extension AlbumPageParser {
         }
 
         if trimmedValue.hasPrefix("//") {
-            return URL(string: "https:\(trimmedValue)")
+            return encodedURL(fromAbsoluteString: "https:\(trimmedValue)")
         }
 
-        if let url = URL(string: trimmedValue), url.scheme != nil {
-            return url
+        if let components = URLComponents(string: trimmedValue),
+           components.scheme != nil {
+            return encodedURL(fromAbsoluteString: trimmedValue)
         }
 
-        let directoryURL = baseURL.absoluteString.hasSuffix("/")
-            ? baseURL
-            : URL(string: "\(baseURL.absoluteString)/") ?? baseURL
-        return URL(string: trimmedValue, relativeTo: directoryURL)?.absoluteURL
+        return encodedURL(fromRelativeReference: trimmedValue, baseURL: baseURL)
+    }
+
+    static func encodedURL(fromAbsoluteString value: String) -> URL? {
+        guard var components = URLComponents(string: value) else {
+            return URL(string: value)
+        }
+
+        applyPreservedPercentEncoding(to: &components, path: components.path)
+        return components.url
+    }
+
+    static func encodedURL(fromRelativeReference value: String, baseURL: URL) -> URL? {
+        guard let referenceComponents = URLComponents(string: value),
+              var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            let directoryURL = baseURL.absoluteString.hasSuffix("/")
+                ? baseURL
+                : URL(string: "\(baseURL.absoluteString)/") ?? baseURL
+            return URL(string: value, relativeTo: directoryURL)?.absoluteURL
+        }
+
+        let path = referenceComponents.path.hasPrefix("/")
+            ? referenceComponents.path
+            : baseDirectoryPath(for: baseURL) + referenceComponents.path
+        applyPreservedPercentEncoding(to: &components, path: path)
+        components.percentEncodedQuery = referenceComponents.query.map {
+            percentEncodePreservingEscapes($0, allowedCharacters: .urlQueryAllowed)
+        }
+        components.percentEncodedFragment = referenceComponents.fragment.map {
+            percentEncodePreservingEscapes($0, allowedCharacters: .urlFragmentAllowed)
+        }
+        return components.url
+    }
+
+    static func applyPreservedPercentEncoding(to components: inout URLComponents, path: String) {
+        components.percentEncodedPath = percentEncodePreservingEscapes(
+            path,
+            allowedCharacters: .urlPathAllowed
+        )
+        components.percentEncodedQuery = components.query.map {
+            percentEncodePreservingEscapes($0, allowedCharacters: .urlQueryAllowed)
+        }
+        components.percentEncodedFragment = components.fragment.map {
+            percentEncodePreservingEscapes($0, allowedCharacters: .urlFragmentAllowed)
+        }
+    }
+
+    static func baseDirectoryPath(for url: URL) -> String {
+        let path = url.path
+        return path.hasSuffix("/") ? path : "\(path)/"
+    }
+
+    static func percentEncodePreservingEscapes(
+        _ value: String,
+        allowedCharacters: CharacterSet
+    ) -> String {
+        var allowedCharacters = allowedCharacters
+        allowedCharacters.remove(charactersIn: "%")
+
+        var encodedValue = ""
+        var index = value.startIndex
+        while index < value.endIndex {
+            if value[index] == "%",
+               let firstHexIndex = value.index(index, offsetBy: 1, limitedBy: value.endIndex),
+               firstHexIndex < value.endIndex,
+               let secondHexIndex = value.index(index, offsetBy: 2, limitedBy: value.endIndex),
+               secondHexIndex < value.endIndex,
+               isHexDigit(value[firstHexIndex]),
+               isHexDigit(value[secondHexIndex]) {
+                encodedValue.append("%")
+                encodedValue.append(value[firstHexIndex])
+                encodedValue.append(value[secondHexIndex])
+                index = value.index(after: secondHexIndex)
+                continue
+            }
+
+            let character = String(value[index])
+            encodedValue += character.addingPercentEncoding(
+                withAllowedCharacters: allowedCharacters
+            ) ?? character
+            index = value.index(after: index)
+        }
+
+        return encodedValue
+    }
+
+    static func isHexDigit(_ character: Character) -> Bool {
+        guard character.unicodeScalars.count == 1,
+              let scalar = character.unicodeScalars.first else {
+            return false
+        }
+
+        return CharacterSet(charactersIn: "0123456789ABCDEFabcdef").contains(scalar)
     }
 
     static func firstCapture(in value: String, pattern: String) -> String? {
