@@ -20,6 +20,29 @@ struct KHPlayerApp: App {
             .frame(minWidth: 880, minHeight: 320)
         }
         .windowStyle(.hiddenTitleBar)
+        .commands {
+            if let appState = launchState.appState {
+                PlaybackCommands(appState: appState)
+            }
+        }
+    }
+}
+
+internal struct PlaybackCommands: Commands {
+    @ObservedObject private var playbackEngine: PlaybackEngine
+
+    internal init(appState: AppState) {
+        self.playbackEngine = appState.playbackEngine
+    }
+
+    internal var body: some Commands {
+        CommandMenu("Playback") {
+            Button("Play/Pause") {
+                playbackEngine.togglePlayPause()
+            }
+            .keyboardShortcut(.space, modifiers: [])
+            .disabled(playbackEngine.currentItem == nil)
+        }
     }
 }
 

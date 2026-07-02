@@ -11,6 +11,7 @@ struct DesignBehaviorChecks {
         try checkAlbumTopBarAppearsOnlyAfterScrolling()
         try checkAppWindowDoesNotRenderPersistentTitleBar()
         try checkAppWindowAllowsCompactPlaybackFriendlySize()
+        try checkSpacebarTogglesPlayback()
         try checkAlbumDetailStartsAtTopAfterHidingTitleBar()
         try checkSearchViewUsesFloatingSearchField()
         try checkSearchAndBackControlsKeepReliableHitTargets()
@@ -196,6 +197,16 @@ struct DesignBehaviorChecks {
 
         precondition(source.contains(".frame(minWidth: 880, minHeight: 320)"))
         precondition(!source.contains(".frame(minWidth: 980, minHeight: 640)"))
+    }
+
+    private static func checkSpacebarTogglesPlayback() throws {
+        let source = try sourceFile("Sources/KHPlayer/App/KHPlayerApp.swift")
+
+        precondition(source.contains("PlaybackCommands(appState: appState)"))
+        precondition(source.contains(".keyboardShortcut(.space, modifiers: [])"))
+        precondition(source.contains("@ObservedObject private var playbackEngine: PlaybackEngine"))
+        precondition(source.contains("playbackEngine.togglePlayPause()"))
+        precondition(source.contains(".disabled(playbackEngine.currentItem == nil)"))
     }
 
     private static func checkAlbumDetailStartsAtTopAfterHidingTitleBar() throws {
