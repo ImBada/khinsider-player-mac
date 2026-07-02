@@ -84,9 +84,10 @@ internal struct AlbumDetailView: View {
         ZStack(alignment: .top) {
             ScrollView {
                 VStack(spacing: 0) {
+                    scrollContentTopSpacer
+
                     header(album)
                         .padding(.horizontal, 52)
-                        .padding(.top, AlbumDetailLayout.headerTopPadding)
                         .padding(.bottom, 30)
 
                     trackList(album)
@@ -110,6 +111,17 @@ internal struct AlbumDetailView: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var scrollContentTopSpacer: some View {
+        Color.clear
+            .frame(height: AlbumDetailLayout.scrollContentTopInset)
+            .background {
+                ScrollIndicatorInsetsSetter(
+                    scrollerTop: AlbumDetailLayout.scrollIndicatorTopInset,
+                    contentTop: AlbumDetailLayout.scrollContentTopInset
+                )
+            }
     }
 
     private var shouldShowCollapsedTopBar: Bool {
@@ -446,12 +458,13 @@ private enum AlbumDetailLayout {
     static let artworkSize: CGFloat = 220
     static let artworkCornerRadius: CGFloat = 6
     static let metadataLineCollapseOffset: CGFloat = 130
-    static let headerTopPadding: CGFloat = 54
     static let topControlsTopPadding: CGFloat = 10
     static let topControlHorizontalPadding: CGFloat = 8
     static let topControlButtonSize: CGFloat = 52
     static let topControlContentSize: CGFloat = 28
     static let topChromeHitExclusionHeight = topControlsTopPadding + topControlButtonSize
+    static let scrollContentTopInset = topChromeHitExclusionHeight
+    static let scrollIndicatorTopInset = topChromeHitExclusionHeight - topControlsTopPadding
     static let actionButtonHeight: CGFloat = 36
     static let actionPlayButtonMinWidth: CGFloat = 118
     static let actionShuffleIconSize: CGFloat = 14
@@ -477,6 +490,69 @@ private struct ScrollOffsetTrackingModifier: ViewModifier {
                         onScroll(offsetY)
                     }
                 }
+        }
+    }
+}
+
+@MainActor
+private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
+    let scrollerTop: CGFloat
+    let contentTop: CGFloat
+
+    func makeNSView(context: Context) -> ScrollIndicatorInsetsView {
+        ScrollIndicatorInsetsView(scrollerTop: scrollerTop, contentTop: contentTop)
+    }
+
+    func updateNSView(_ nsView: ScrollIndicatorInsetsView, context: Context) {
+        nsView.scrollerTop = scrollerTop
+        nsView.contentTop = contentTop
+        nsView.updateScrollIndicatorInsets()
+    }
+
+    final class ScrollIndicatorInsetsView: NSView {
+        var scrollerTop: CGFloat
+        var contentTop: CGFloat
+
+        init(scrollerTop: CGFloat, contentTop: CGFloat) {
+            self.scrollerTop = scrollerTop
+            self.contentTop = contentTop
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) {
+            nil
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            updateScrollIndicatorInsets()
+        }
+
+        override func layout() {
+            super.layout()
+            updateScrollIndicatorInsets()
+        }
+
+        func updateScrollIndicatorInsets() {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateScrollIndicatorInsetsNow()
+            }
+        }
+
+        private func updateScrollIndicatorInsetsNow() {
+            guard let scrollView = enclosingScrollView else {
+                return
+            }
+
+            var insets = scrollView.scrollerInsets
+            insets.top = scrollerTop
+            scrollView.scrollerInsets = insets
+
+            var contentInsets = scrollView.contentInsets
+            contentInsets.top = contentTop
+            scrollView.contentInsets = contentInsets
+
+            scrollView.tile()
         }
     }
 }
