@@ -103,7 +103,11 @@ internal struct AlbumDetailView: View {
             collapsedTopBar(album: album, isVisible: shouldShowCollapsedTopBar)
                 .zIndex(AlbumDetailLayout.collapsedTopBarZIndex)
 
-            AlbumTopControls(onBack: onBack)
+            AlbumTopControls(
+                albumURL: album.url,
+                onBack: onBack,
+                onOpenInBrowser: openAlbumInBrowser
+            )
                 .padding(.horizontal, 22)
                 .padding(.top, AlbumDetailLayout.topControlsTopPadding)
                 .zIndex(AlbumDetailLayout.topControlsZIndex)
@@ -373,6 +377,10 @@ internal struct AlbumDetailView: View {
         }
 
         return currentItem.album.id == album.id && currentItem.track.id == track.id
+    }
+
+    private func openAlbumInBrowser(_ url: URL) {
+        NSWorkspace.shared.open(url)
     }
 }
 
@@ -670,7 +678,9 @@ private struct AlbumActionBar: View {
 }
 
 private struct AlbumTopControls: View {
+    let albumURL: URL
     let onBack: () -> Void
+    let onOpenInBrowser: (URL) -> Void
 
     var body: some View {
         HStack {
@@ -691,6 +701,26 @@ private struct AlbumTopControls: View {
             .accessibilityLabel("Back")
 
             Spacer()
+
+            Menu {
+                Button {
+                    onOpenInBrowser(albumURL)
+                } label: {
+                    Label("View on Web", systemImage: "safari")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(
+                        width: AlbumDetailLayout.topControlContentSize,
+                        height: AlbumDetailLayout.topControlContentSize
+                    )
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .help("More")
+            .accessibilityLabel("More")
         }
     }
 }

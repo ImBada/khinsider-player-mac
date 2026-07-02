@@ -6,7 +6,7 @@ struct DesignBehaviorChecks {
         try checkAlbumHeaderUsesMusicStyleLayout()
         try checkMiniPlayerFloatsOverContent()
         try checkTrackListUsesMusicStyleDiscSections()
-        try checkAlbumTopChromeOnlyShowsBackButton()
+        try checkAlbumTopChromeIncludesWebButton()
         try checkAlbumDetailUsesSinglePageScroll()
         try checkAlbumTopBarAppearsOnlyAfterScrolling()
         try checkAppWindowDoesNotRenderPersistentTitleBar()
@@ -116,15 +116,24 @@ struct DesignBehaviorChecks {
         precondition(!trackDetailParser.contains("\"flac\""))
     }
 
-    private static func checkAlbumTopChromeOnlyShowsBackButton() throws {
+    private static func checkAlbumTopChromeIncludesWebButton() throws {
         let source = try sourceFile("Sources/KHPlayer/Features/Album/AlbumDetailView.swift")
         let contentView = try sourceFile("Sources/KHPlayer/Features/Shell/ContentView.swift")
 
         precondition(source.contains("private let onBack: () -> Void"))
-        precondition(source.contains("AlbumTopControls(onBack: onBack)"))
+        precondition(source.contains("AlbumTopControls("))
+        precondition(source.contains("albumURL: album.url"))
+        precondition(source.contains("onOpenInBrowser: openAlbumInBrowser"))
+        precondition(source.contains("private func openAlbumInBrowser(_ url: URL)"))
+        precondition(source.contains("NSWorkspace.shared.open(url)"))
         precondition(!source.contains("ShareLink(item: album.url)"))
-        precondition(!source.contains("Label(\"Open in Browser\", systemImage: \"safari\")"))
-        precondition(!source.contains("Image(systemName: \"ellipsis\")"))
+        precondition(source.contains("Menu {"))
+        precondition(source.contains("Button {"))
+        precondition(source.contains("onOpenInBrowser(albumURL)"))
+        precondition(source.contains("Label(\"View on Web\", systemImage: \"safari\")"))
+        precondition(source.contains("Image(systemName: \"ellipsis\")"))
+        precondition(source.contains(".help(\"More\")"))
+        precondition(source.contains(".accessibilityLabel(\"More\")"))
         precondition(!source.contains(".navigationTitle(viewModel.album?.title"))
         precondition(contentView.contains("onBack: closeAlbum"))
         precondition(!contentView.contains(".toolbar {"))
@@ -170,7 +179,8 @@ struct DesignBehaviorChecks {
         precondition(source.contains("findScrollView(in view: NSView)"))
         precondition(source.contains(".opacity(isVisible ? 1 : 0)"))
         precondition(source.contains(".zIndex(AlbumDetailLayout.collapsedTopBarZIndex)"))
-        precondition(source.contains("AlbumTopControls(onBack: onBack)"))
+        precondition(source.contains("AlbumTopControls("))
+        precondition(source.contains("albumURL: album.url"))
     }
 
     private static func checkAppWindowDoesNotRenderPersistentTitleBar() throws {
