@@ -432,7 +432,6 @@ private enum AlbumDetailLayout {
     static let topControlsTopPadding: CGFloat = 10
     static let topControlButtonSize: CGFloat = 52
     static let topControlContentSize: CGFloat = 28
-    static let topControlHitPadding: CGFloat = 12
     static let actionButtonHeight: CGFloat = 36
     static let actionPlayButtonMinWidth: CGFloat = 118
     static let actionShuffleIconSize: CGFloat = 14
@@ -684,7 +683,6 @@ private struct AlbumTopControls: View {
                         width: AlbumDetailLayout.topControlContentSize,
                         height: AlbumDetailLayout.topControlContentSize
                     )
-                    .padding(AlbumDetailLayout.topControlHitPadding)
                     .contentShape(Circle())
             }
             .buttonStyle(.glass)

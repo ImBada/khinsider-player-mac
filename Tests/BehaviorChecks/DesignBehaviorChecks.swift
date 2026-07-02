@@ -259,9 +259,9 @@ struct DesignBehaviorChecks {
         precondition(searchSource.contains("SearchChromeMetrics.headerHeight"))
         precondition(searchSource.contains("internal static let headerHeight = searchFieldHeight + headerVerticalPadding * 2"))
 
-        precondition(albumSource.contains("static let topControlHitPadding: CGFloat = 12"))
-        precondition(albumSource.contains(".padding(AlbumDetailLayout.topControlHitPadding)"))
         precondition(albumSource.contains(".contentShape(Circle())"))
+        precondition(!albumSource.contains("topControlHitPadding"))
+        precondition(!albumSource.contains(".padding(AlbumDetailLayout.topControlHitPadding)"))
     }
 
     private static func checkSearchClearsResultsInsteadOfOverlayingLoading() throws {
