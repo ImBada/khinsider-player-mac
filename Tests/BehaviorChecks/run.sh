@@ -47,6 +47,16 @@ swiftc \
 /tmp/khinsider-player-album-parser-checks
 
 swiftc \
+  -I "$BUILD_DIR" \
+  "$BUILD_DIR/SwiftSoup.o" \
+  Sources/KHPlayer/Domain/Models.swift \
+  Sources/KHPlayer/Parsing/TrackDetailParser.swift \
+  Tests/BehaviorChecks/TrackDetailParserBehaviorChecks.swift \
+  -o /tmp/khinsider-player-track-detail-parser-checks
+
+/tmp/khinsider-player-track-detail-parser-checks
+
+swiftc \
   Sources/KHPlayer/Domain/KHError.swift \
   Sources/KHPlayer/Networking/KHClient.swift \
   Tests/BehaviorChecks/StreamMetadataBehaviorChecks.swift \
