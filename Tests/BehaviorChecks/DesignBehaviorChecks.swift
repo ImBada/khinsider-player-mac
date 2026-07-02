@@ -132,6 +132,7 @@ struct DesignBehaviorChecks {
         precondition(source.contains("onOpenInBrowser(albumURL)"))
         precondition(source.contains("Label(\"View on Web\", systemImage: \"safari\")"))
         precondition(source.contains("Image(systemName: \"ellipsis\")"))
+        precondition(source.contains(".menuIndicator(.hidden)"))
         precondition(source.contains(".help(\"More\")"))
         precondition(source.contains(".accessibilityLabel(\"More\")"))
         precondition(!source.contains(".navigationTitle(viewModel.album?.title"))

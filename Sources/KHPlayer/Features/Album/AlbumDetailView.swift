@@ -719,6 +719,7 @@ private struct AlbumTopControls: View {
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
+            .menuIndicator(.hidden)
             .help("More")
             .accessibilityLabel("More")
         }
