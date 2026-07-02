@@ -134,6 +134,7 @@ internal struct AlbumDetailView: View {
     private func albumTopBarDragArea(isVisible: Bool) -> some View {
         AlbumTopBarDragArea(isVisible: isVisible)
             .frame(height: AlbumDetailLayout.collapsedTopBarHeight)
+            .padding(.horizontal, AlbumDetailLayout.topControlDragExclusionWidth)
             .frame(maxWidth: .infinity, alignment: .top)
             .accessibilityHidden(true)
     }
@@ -467,31 +468,11 @@ private struct AlbumTopBarDragArea: NSViewRepresentable {
                 return nil
             }
 
-            return controlExclusionRects.contains { rect in
-                rect.contains(point)
-            } ? nil : self
+            return self
         }
 
         override func mouseDown(with event: NSEvent) {
             window?.performDrag(with: event)
-        }
-
-        private var controlExclusionRects: [NSRect] {
-            let width = AlbumDetailLayout.topControlHorizontalPadding + AlbumDetailLayout.topControlButtonSize
-            let leadingRect = NSRect(
-                x: 0,
-                y: 0,
-                width: width,
-                height: bounds.height
-            )
-            let trailingRect = NSRect(
-                x: max(0, bounds.width - width),
-                y: 0,
-                width: width,
-                height: bounds.height
-            )
-
-            return [leadingRect, trailingRect]
         }
     }
 }
@@ -504,6 +485,7 @@ private enum AlbumDetailLayout {
     static let topControlsTopPadding: CGFloat = 10
     static let topControlHorizontalPadding: CGFloat = 22
     static let topControlButtonSize: CGFloat = 52
+    static let topControlDragExclusionWidth: CGFloat = 104
     static let topControlContentSize: CGFloat = 28
     static let actionButtonHeight: CGFloat = 36
     static let actionPlayButtonMinWidth: CGFloat = 118
@@ -511,7 +493,7 @@ private enum AlbumDetailLayout {
     static let collapsedTopBarHeight = topControlButtonSize
     static let collapsedTopBarZIndex: Double = 10
     static let topBarDragAreaZIndex: Double = 15
-    static let topControlsZIndex: Double = 20
+    static let topControlsZIndex: Double = 30
 }
 
 private struct ScrollOffsetTrackingModifier: ViewModifier {
