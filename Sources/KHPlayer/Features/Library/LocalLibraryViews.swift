@@ -773,7 +773,7 @@ private struct HistorySongsTable: View {
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            HistorySongsDoubleClickMonitor(
+            HistorySongsClickMonitor(
                 selectedTrackID: selectedTrackID,
                 tracks: entries,
                 onPlayTrack: onPlayTrack
@@ -927,7 +927,7 @@ private struct FavoriteSongsTable: View {
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            FavoriteSongsDoubleClickMonitor(
+            FavoriteSongsClickMonitor(
                 selectedTrackID: selectedTrackID,
                 tracks: tracks,
                 onPlayTrack: onPlayTrack
@@ -1006,7 +1006,7 @@ private struct FavoriteSongTextCell: View {
     }
 }
 
-private struct HistorySongsDoubleClickMonitor: NSViewRepresentable {
+private struct HistorySongsClickMonitor: NSViewRepresentable {
     let selectedTrackID: Binding<String?>
     let tracks: [HistoryEntry]
     let onPlayTrack: (HistoryEntry) -> Void
@@ -1084,8 +1084,7 @@ private struct HistorySongsDoubleClickMonitor: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) -> NSEvent {
-            guard event.clickCount >= 2,
-                  let view,
+            guard let view,
                   let window = view.window,
                   event.window === window else {
                 return event
@@ -1102,6 +1101,10 @@ private struct HistorySongsDoubleClickMonitor: NSViewRepresentable {
             }
 
             selectedTrackID.wrappedValue = track.id
+
+            guard event.clickCount >= 2 else {
+                return event
+            }
 
             Task { @MainActor [weak self, track] in
                 self?.onPlayTrack(track)
@@ -1148,7 +1151,7 @@ private struct HistorySongsDoubleClickMonitor: NSViewRepresentable {
     }
 }
 
-private struct FavoriteSongsDoubleClickMonitor: NSViewRepresentable {
+private struct FavoriteSongsClickMonitor: NSViewRepresentable {
     let selectedTrackID: Binding<String?>
     let tracks: [FavoriteTrackEntry]
     let onPlayTrack: (FavoriteTrackEntry) -> Void
@@ -1226,8 +1229,7 @@ private struct FavoriteSongsDoubleClickMonitor: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) -> NSEvent {
-            guard event.clickCount >= 2,
-                  let view,
+            guard let view,
                   let window = view.window,
                   event.window === window else {
                 return event
@@ -1244,6 +1246,10 @@ private struct FavoriteSongsDoubleClickMonitor: NSViewRepresentable {
             }
 
             selectedTrackID.wrappedValue = track.id
+
+            guard event.clickCount >= 2 else {
+                return event
+            }
 
             Task { @MainActor [weak self, track] in
                 self?.onPlayTrack(track)
