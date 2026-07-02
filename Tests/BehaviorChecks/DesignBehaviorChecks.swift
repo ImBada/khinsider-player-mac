@@ -10,6 +10,7 @@ struct DesignBehaviorChecks {
         try checkAlbumDetailUsesSinglePageScroll()
         try checkAlbumTopBarAppearsOnlyAfterScrolling()
         try checkAppWindowDoesNotRenderPersistentTitleBar()
+        try checkAppWindowAllowsCompactPlaybackFriendlySize()
         try checkAlbumDetailStartsAtTopAfterHidingTitleBar()
         try checkSearchViewUsesFloatingSearchField()
         try checkSearchAndBackControlsKeepReliableHitTargets()
@@ -177,6 +178,13 @@ struct DesignBehaviorChecks {
 
         precondition(source.contains(".windowStyle(.hiddenTitleBar)"))
         precondition(!source.contains(".windowStyle(.titleBar)"))
+    }
+
+    private static func checkAppWindowAllowsCompactPlaybackFriendlySize() throws {
+        let source = try sourceFile("Sources/KHPlayer/App/KHPlayerApp.swift")
+
+        precondition(source.contains(".frame(minWidth: 880, minHeight: 320)"))
+        precondition(!source.contains(".frame(minWidth: 980, minHeight: 640)"))
     }
 
     private static func checkAlbumDetailStartsAtTopAfterHidingTitleBar() throws {

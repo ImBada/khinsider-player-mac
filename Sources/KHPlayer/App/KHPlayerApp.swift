@@ -17,7 +17,7 @@ struct KHPlayerApp: App {
                     )
                 }
             }
-            .frame(minWidth: 980, minHeight: 640)
+            .frame(minWidth: 880, minHeight: 320)
         }
         .windowStyle(.hiddenTitleBar)
     }
