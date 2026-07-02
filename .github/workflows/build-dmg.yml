@@ -96,7 +96,7 @@ jobs:
             exit 1
           fi
 
-          UPDATE_BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          UPDATE_BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/"
           echo "$SPARKLE_PRIVATE_ED_KEY" | "$GENERATE_APPCAST" \
             --ed-key-file - \
             --download-url-prefix "$UPDATE_BASE_URL" \
