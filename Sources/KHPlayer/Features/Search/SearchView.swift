@@ -275,6 +275,7 @@ internal enum SearchChromeMetrics {
     internal static let outerHorizontalPadding: CGFloat = 28
     internal static let headerHorizontalPadding: CGFloat = 14
     internal static let headerVerticalPadding: CGFloat = 4
+    internal static let headerHeight = searchFieldHeight + headerVerticalPadding * 2
     internal static let headerMaxWidth: CGFloat = 340
     internal static let searchFieldMaxWidth: CGFloat = 312
     internal static let searchFieldHeight: CGFloat = 34
@@ -338,6 +339,14 @@ private struct SearchChromeDragArea: NSViewRepresentable {
             true
         }
 
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard bounds.contains(point) else {
+                return nil
+            }
+
+            return searchHeaderExclusionRect.contains(point) ? nil : self
+        }
+
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
 
@@ -371,6 +380,22 @@ private struct SearchChromeDragArea: NSViewRepresentable {
 
         override func mouseDown(with event: NSEvent) {
             window?.performDrag(with: event)
+        }
+
+        private var searchHeaderExclusionRect: NSRect {
+            let width = min(bounds.width, SearchChromeMetrics.headerMaxWidth)
+            let originX = (bounds.width - width) / 2
+            let originY = max(
+                0,
+                bounds.height - SearchChromeMetrics.headerTopPadding - SearchChromeMetrics.headerHeight
+            )
+
+            return NSRect(
+                x: originX,
+                y: originY,
+                width: width,
+                height: SearchChromeMetrics.headerHeight
+            )
         }
     }
 }

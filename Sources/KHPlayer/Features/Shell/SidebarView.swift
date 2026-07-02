@@ -126,7 +126,7 @@ private struct SidebarUpdateButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(.white)
         .background(Color.accentColor, in: Capsule(style: .continuous))
-        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+        .shadow(color: AdaptiveSystemColors.shadow.opacity(0.18), radius: 8, x: 0, y: 3)
         .help("Open the latest GitHub release")
     }
 }

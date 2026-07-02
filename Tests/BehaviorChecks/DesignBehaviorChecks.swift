@@ -12,6 +12,7 @@ struct DesignBehaviorChecks {
         try checkAppWindowDoesNotRenderPersistentTitleBar()
         try checkAlbumDetailStartsAtTopAfterHidingTitleBar()
         try checkSearchViewUsesFloatingSearchField()
+        try checkSearchAndBackControlsKeepReliableHitTargets()
         try checkSearchClearsResultsInsteadOfOverlayingLoading()
         try checkSearchStateSurvivesAlbumDetailNavigation()
         try checkAlbumDetailOverlaysDestinationInsteadOfReplacingIt()
@@ -246,6 +247,21 @@ struct DesignBehaviorChecks {
         precondition(!source.contains(".stroke(Color.pink"))
         precondition(!source.contains(".textFieldStyle(.roundedBorder)"))
         precondition(!source.contains(".navigationTitle(\"Search\")"))
+    }
+
+    private static func checkSearchAndBackControlsKeepReliableHitTargets() throws {
+        let searchSource = try sourceFile("Sources/KHPlayer/Features/Search/SearchView.swift")
+        let albumSource = try sourceFile("Sources/KHPlayer/Features/Album/AlbumDetailView.swift")
+
+        precondition(searchSource.contains("override func hitTest(_ point: NSPoint) -> NSView?"))
+        precondition(searchSource.contains("searchHeaderExclusionRect.contains(point) ? nil : self"))
+        precondition(searchSource.contains("private var searchHeaderExclusionRect: NSRect"))
+        precondition(searchSource.contains("SearchChromeMetrics.headerHeight"))
+        precondition(searchSource.contains("internal static let headerHeight = searchFieldHeight + headerVerticalPadding * 2"))
+
+        precondition(albumSource.contains("static let topControlHitPadding: CGFloat = 12"))
+        precondition(albumSource.contains(".padding(AlbumDetailLayout.topControlHitPadding)"))
+        precondition(albumSource.contains(".contentShape(Circle())"))
     }
 
     private static func checkSearchClearsResultsInsteadOfOverlayingLoading() throws {
