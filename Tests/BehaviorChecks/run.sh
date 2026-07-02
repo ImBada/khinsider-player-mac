@@ -130,3 +130,10 @@ swiftc \
   -o /tmp/khinsider-player-design-checks
 
 /tmp/khinsider-player-design-checks
+
+swiftc \
+  -parse-as-library \
+  Tests/BehaviorChecks/UpdateBehaviorChecks.swift \
+  -o /tmp/khinsider-player-update-checks
+
+/tmp/khinsider-player-update-checks

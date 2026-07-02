@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build-dmg:
@@ -32,14 +34,18 @@ jobs:
         env:
           CONFIGURATION: debug
           OUTPUT_DIR: dist
+          SPARKLE_FEED_URL: https://imbada.github.io/khinsider-player-mac/appcast.xml
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
             APP_VERSION="${GITHUB_REF_NAME#v}"
+            REQUIRE_SPARKLE_KEYS=1
           else
             APP_VERSION="${{ inputs.version || '0.1.0' }}"
+            REQUIRE_SPARKLE_KEYS=0
           fi
 
-          VERSION="$APP_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" ./Scripts/package_app.sh
+          VERSION="$APP_VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER" REQUIRE_SPARKLE_KEYS="$REQUIRE_SPARKLE_KEYS" ./Scripts/package_app.sh
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
 
       - name: Create DMG
@@ -60,6 +66,42 @@ jobs:
 
           hdiutil verify "$DMG_PATH"
 
+      - name: Create Sparkle update archive
+        run: |
+          SPARKLE_ROOT="dist/sparkle-root"
+          SPARKLE_UPDATES="dist/sparkle-updates"
+          SPARKLE_ZIP="$SPARKLE_UPDATES/KHInsider-Player-${APP_VERSION}.zip"
+
+          rm -rf "$SPARKLE_ROOT" "$SPARKLE_UPDATES"
+          mkdir -p "$SPARKLE_ROOT" "$SPARKLE_UPDATES"
+          cp -R "dist/KHPlayer.app" "$SPARKLE_ROOT/KHInsider Player.app"
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$SPARKLE_ROOT/KHInsider Player.app" \
+            "$SPARKLE_ZIP"
+
+      - name: Generate Sparkle appcast
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          if [[ -z "${SPARKLE_PRIVATE_ED_KEY:-}" ]]; then
+            echo "SPARKLE_PRIVATE_ED_KEY secret is required for Sparkle appcast signing." >&2
+            exit 1
+          fi
+
+          GENERATE_APPCAST="$(find .build -path "*/Sparkle/bin/generate_appcast" -type f | head -n 1)"
+          if [[ -z "$GENERATE_APPCAST" || ! -x "$GENERATE_APPCAST" ]]; then
+            echo "Missing Sparkle generate_appcast tool." >&2
+            exit 1
+          fi
+
+          UPDATE_BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          echo "$SPARKLE_PRIVATE_ED_KEY" | "$GENERATE_APPCAST" \
+            --ed-key-file - \
+            --download-url-prefix "$UPDATE_BASE_URL" \
+            dist/sparkle-updates
+
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
@@ -67,15 +109,39 @@ jobs:
           path: dist/*.dmg
           if-no-files-found: error
 
-      - name: Attach DMG to GitHub Release
+      - name: Upload Sparkle update artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KHInsider-Player-${{ env.APP_VERSION }}-Sparkle
+          path: dist/sparkle-updates/*
+          if-no-files-found: error
+
+      - name: Attach DMG and Sparkle archive to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.dmg --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/sparkle-updates/*.zip --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.dmg \
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/sparkle-updates/*.zip \
               --title "$GITHUB_REF_NAME" \
               --notes "Automated KHInsider Player build."
           fi
+
+      - name: Prepare Sparkle appcast for GitHub Pages
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p dist/pages
+          cp dist/sparkle-updates/appcast.xml dist/pages/appcast.xml
+
+      - name: Upload Sparkle appcast Pages artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/pages
+
+      - name: Deploy Sparkle appcast to GitHub Pages
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: deployment
+        uses: actions/deploy-pages@v4

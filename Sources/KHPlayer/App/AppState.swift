@@ -11,6 +11,7 @@ internal final class AppState: ObservableObject {
     internal let artworkCache: ArtworkCache
     internal let searchViewModel: SearchViewModel
     internal let releaseChecker: GitHubReleaseChecker
+    internal let appUpdater: AppUpdater
 
     @Published internal private(set) var cacheLimitBytes: Int64 = 256 * 1024 * 1024
     @Published internal private(set) var playbackEngine: PlaybackEngine
@@ -22,6 +23,7 @@ internal final class AppState: ObservableObject {
     internal init() throws {
         let client = KHClient()
         let releaseChecker = GitHubReleaseChecker()
+        let appUpdater = AppUpdater()
         let streamResolver = StreamResolver(client: client)
         let libraryStore = try LibraryStore.appStore()
         let artworkCache = try ArtworkCache.appCache()
@@ -35,6 +37,7 @@ internal final class AppState: ObservableObject {
         self.artworkCache = artworkCache
         self.searchViewModel = SearchViewModel(client: client)
         self.releaseChecker = releaseChecker
+        self.appUpdater = appUpdater
         self.activeTrackCache = cache
         self.playbackEngine = playbackEngine
     }
@@ -70,6 +73,10 @@ internal final class AppState: ObservableObject {
         activeTrackCache = cache
         self.playbackEngine = playbackEngine
         cacheLimitBytes = limitBytes
+    }
+
+    internal func checkForUpdates() {
+        appUpdater.checkForUpdates()
     }
 
     private static func makeActiveTrackCache(limitBytes: Int64) throws -> ActiveTrackCache {

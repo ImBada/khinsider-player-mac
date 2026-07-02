@@ -55,7 +55,6 @@ internal enum SidebarDestination: String, CaseIterable, Identifiable, Hashable {
 
 internal struct SidebarView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.openURL) private var openURL
 
     @Binding private var selection: SidebarDestination?
     private var _isFavoritesExpanded = State<Bool>(initialValue: true)
@@ -100,9 +99,9 @@ internal struct SidebarView: View {
         .background(SidebarSplitCollapseGuard(minimumThickness: SidebarLayout.minimumWidth))
         .toolbar(removing: .sidebarToggle)
         .overlay(alignment: .bottomTrailing) {
-            if let updateAvailability = appState.updateAvailability {
+            if appState.updateAvailability != nil {
                 SidebarUpdateButton {
-                    openURL(updateAvailability.releaseURL)
+                    appState.checkForUpdates()
                 }
                 .padding(.trailing, 14)
                 .padding(.bottom, 14)
@@ -127,6 +126,6 @@ private struct SidebarUpdateButton: View {
         .foregroundStyle(.white)
         .background(Color.accentColor, in: Capsule(style: .continuous))
         .shadow(color: AdaptiveSystemColors.shadow.opacity(0.18), radius: 8, x: 0, y: 3)
-        .help("Open the latest GitHub release")
+        .help("Check for and install app updates")
     }
 }
