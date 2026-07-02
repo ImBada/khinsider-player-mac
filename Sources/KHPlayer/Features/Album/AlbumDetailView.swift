@@ -100,43 +100,20 @@ internal struct AlbumDetailView: View {
             })
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            collapsedTopBar(album: album, isVisible: shouldShowCollapsedTopBar)
-                .zIndex(AlbumDetailLayout.collapsedTopBarZIndex)
-
-            albumTopBarDragArea(isVisible: shouldShowCollapsedTopBar)
-                .zIndex(AlbumDetailLayout.topBarDragAreaZIndex)
-
-            AlbumTopControls(
+            AlbumTopChrome(
+                title: album.title,
+                subtitle: collapsedSubtitle(for: album),
+                isCollapsedTopBarVisible: shouldShowCollapsedTopBar,
                 albumURL: album.url,
                 onBack: onBack,
                 onOpenInBrowser: openAlbumInBrowser
             )
-                .padding(.horizontal, AlbumDetailLayout.topControlHorizontalPadding)
-                .padding(.top, AlbumDetailLayout.topControlsTopPadding)
-                .zIndex(AlbumDetailLayout.topControlsZIndex)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var shouldShowCollapsedTopBar: Bool {
         scrollOffsetY >= AlbumDetailLayout.metadataLineCollapseOffset
-    }
-
-    private func collapsedTopBar(album: AlbumDetail, isVisible: Bool) -> some View {
-        AlbumCollapsedTopBar(
-            title: album.title,
-            subtitle: collapsedSubtitle(for: album),
-            isVisible: isVisible
-        )
-        .animation(.easeInOut(duration: 0.16), value: isVisible)
-    }
-
-    private func albumTopBarDragArea(isVisible: Bool) -> some View {
-        AlbumTopBarDragArea(isVisible: isVisible)
-            .frame(height: AlbumDetailLayout.collapsedTopBarHeight)
-            .padding(.horizontal, AlbumDetailLayout.topControlDragExclusionWidth)
-            .frame(maxWidth: .infinity, alignment: .top)
-            .accessibilityHidden(true)
     }
 
     private func header(_ album: AlbumDetail) -> some View {
@@ -444,31 +421,19 @@ private struct AlbumCollapsedTopBar: View {
 }
 
 private struct AlbumTopBarDragArea: NSViewRepresentable {
-    let isVisible: Bool
-
     func makeNSView(context: Context) -> DragAreaView {
-        let view = DragAreaView()
-        view.isVisible = isVisible
-        return view
+        DragAreaView()
     }
 
-    func updateNSView(_ nsView: DragAreaView, context: Context) {
-        nsView.isVisible = isVisible
-    }
+    func updateNSView(_ nsView: DragAreaView, context: Context) {}
 
     final class DragAreaView: NSView {
-        var isVisible = false
-
         override var acceptsFirstResponder: Bool {
             true
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? {
-            guard isVisible, bounds.contains(point) else {
-                return nil
-            }
-
-            return self
+            bounds.contains(point) ? self : nil
         }
 
         override func mouseDown(with event: NSEvent) {
@@ -483,17 +448,14 @@ private enum AlbumDetailLayout {
     static let metadataLineCollapseOffset: CGFloat = 130
     static let headerTopPadding: CGFloat = 54
     static let topControlsTopPadding: CGFloat = 10
-    static let topControlHorizontalPadding: CGFloat = 22
+    static let topControlHorizontalPadding: CGFloat = 8
     static let topControlButtonSize: CGFloat = 52
-    static let topControlDragExclusionWidth: CGFloat = 104
     static let topControlContentSize: CGFloat = 28
+    static let topChromeHitExclusionHeight = topControlsTopPadding + topControlButtonSize
     static let actionButtonHeight: CGFloat = 36
     static let actionPlayButtonMinWidth: CGFloat = 118
     static let actionShuffleIconSize: CGFloat = 14
     static let collapsedTopBarHeight = topControlButtonSize
-    static let collapsedTopBarZIndex: Double = 10
-    static let topBarDragAreaZIndex: Double = 15
-    static let topControlsZIndex: Double = 30
 }
 
 private struct ScrollOffsetTrackingModifier: ViewModifier {
@@ -725,13 +687,42 @@ private struct AlbumActionBar: View {
     }
 }
 
+private struct AlbumTopChrome: View {
+    let title: String
+    let subtitle: String
+    let isCollapsedTopBarVisible: Bool
+    let albumURL: URL
+    let onBack: () -> Void
+    let onOpenInBrowser: (URL) -> Void
+
+    var body: some View {
+        AlbumTopControls(
+            albumURL: albumURL,
+            onBack: onBack,
+            onOpenInBrowser: onOpenInBrowser
+        )
+        .padding(.horizontal, AlbumDetailLayout.topControlHorizontalPadding)
+        .padding(.top, AlbumDetailLayout.topControlsTopPadding)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .background(alignment: .top) {
+            AlbumCollapsedTopBar(
+                title: title,
+                subtitle: subtitle,
+                isVisible: isCollapsedTopBarVisible
+            )
+            .animation(.easeInOut(duration: 0.16), value: isCollapsedTopBarVisible)
+            .allowsHitTesting(false)
+        }
+    }
+}
+
 private struct AlbumTopControls: View {
     let albumURL: URL
     let onBack: () -> Void
     let onOpenInBrowser: (URL) -> Void
 
     var body: some View {
-        HStack {
+        HStack(spacing: 0) {
             Button {
                 onBack()
             } label: {
@@ -747,8 +738,16 @@ private struct AlbumTopControls: View {
             .buttonBorderShape(.circle)
             .help("Back")
             .accessibilityLabel("Back")
+            .frame(
+                width: AlbumDetailLayout.topControlButtonSize,
+                height: AlbumDetailLayout.topControlButtonSize,
+                alignment: .topLeading
+            )
 
-            Spacer()
+            AlbumTopBarDragArea()
+                .frame(height: AlbumDetailLayout.collapsedTopBarHeight)
+                .frame(maxWidth: .infinity)
+                .accessibilityHidden(true)
 
             Menu {
                 Button {
@@ -770,6 +769,11 @@ private struct AlbumTopControls: View {
             .menuIndicator(.hidden)
             .help("More")
             .accessibilityLabel("More")
+            .frame(
+                width: AlbumDetailLayout.topControlButtonSize,
+                height: AlbumDetailLayout.topControlButtonSize,
+                alignment: .topTrailing
+            )
         }
     }
 }
@@ -1201,9 +1205,26 @@ private struct TrackRowHoverTrackingView: NSViewRepresentable {
             guard let window, event.window === window else {
                 return false
             }
+            guard !isInsideTopChrome(event) else {
+                return false
+            }
 
             let point = convert(event.locationInWindow, from: nil)
             return favoriteTrackingRect.contains(point)
+        }
+
+        private func isInsideTopChrome(_ event: NSEvent) -> Bool {
+            guard let contentView = window?.contentView else {
+                return false
+            }
+
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            if contentView.isFlipped {
+                return point.y <= contentView.bounds.minY + AlbumDetailLayout.topChromeHitExclusionHeight
+            }
+
+            let topChromeMinY = contentView.bounds.maxY - AlbumDetailLayout.topChromeHitExclusionHeight
+            return point.y >= topChromeMinY
         }
 
         private func installScrollBoundsObserver() {
