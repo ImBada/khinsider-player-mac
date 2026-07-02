@@ -37,6 +37,10 @@ struct UpdateBehaviorChecks {
         precondition(workflow.contains("Create Sparkle update archive"))
         precondition(workflow.contains("Generate Sparkle appcast"))
         precondition(workflow.contains("Upload Sparkle update artifact"))
+        precondition(workflow.contains("Generate GitHub release notes"))
+        precondition(workflow.contains("repos/${GITHUB_REPOSITORY}/releases/generate-notes"))
+        precondition(workflow.contains("--notes-file dist/release-notes.md"))
+        precondition(workflow.contains("gh release edit \"$GITHUB_REF_NAME\" --notes-file dist/release-notes.md"))
         precondition(workflow.contains("releases/download/${GITHUB_REF_NAME}/"))
         precondition(workflow.contains("gh release upload \"$GITHUB_REF_NAME\" dist/*.dmg dist/sparkle-updates/*.zip --clobber"))
     }
