@@ -506,6 +506,20 @@ private struct MiniPlayerFavoriteButton: View {
 
     private var _isButtonHovered = State<Bool>(initialValue: false)
 
+    init(
+        title: String,
+        isFavorite: Bool,
+        isVisible: Bool,
+        isEnabled: Bool,
+        onToggleFavorite: @escaping () -> Void
+    ) {
+        self.title = title
+        self.isFavorite = isFavorite
+        self.isVisible = isVisible
+        self.isEnabled = isEnabled
+        self.onToggleFavorite = onToggleFavorite
+    }
+
     var body: some View {
         Button(action: onToggleFavorite) {
             Image(systemName: isFavorite ? "star.fill" : "star")
