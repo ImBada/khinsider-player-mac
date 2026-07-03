@@ -31,6 +31,7 @@ struct DesignBehaviorChecks {
         try checkMiniPlayerVolumeControlMatchesMusicBehavior()
         try checkMiniPlayerPlaybackFaderMatchesMusicBehavior()
         try checkMiniPlayerTrackInfoCanToggleCurrentTrackFavorite()
+        try checkFavoriteTrackTogglesSyncAcrossVisibleControls()
         try checkMiniPlayerShowsCurrentAlbumArtwork()
         try checkMiniPlayerArtworkNavigatesToCurrentAlbum()
         try checkSidebarStaysVisible()
@@ -940,6 +941,48 @@ struct DesignBehaviorChecks {
         precondition(miniPlayer.contains("static let favoriteButtonSize: CGFloat = 18"))
         precondition(store.contains("func setTrackFavorite(album: AlbumDetail, track: Track, isFavorite: Bool) throws"))
         precondition(store.contains("func isTrackFavorite(trackID: String) throws -> Bool"))
+    }
+
+    private static func checkFavoriteTrackTogglesSyncAcrossVisibleControls() throws {
+        let store = try sourceFile("Sources/KHPlayer/Persistence/LibraryStore.swift")
+        let albumViewModel = try sourceFile("Sources/KHPlayer/Features/Album/AlbumDetailViewModel.swift")
+        let miniPlayer = try sourceFile("Sources/KHPlayer/Features/Player/MiniPlayerView.swift")
+        let libraryView = try sourceFile("Sources/KHPlayer/Features/Library/LocalLibraryViews.swift")
+
+        precondition(store.contains("import Combine"))
+        precondition(store.contains("struct FavoriteTrackFavoriteChange: Equatable"))
+        precondition(store.contains("let favoriteTrackChanges = PassthroughSubject<FavoriteTrackFavoriteChange, Never>()"))
+        precondition(store.contains("favoriteTrackChanges.send("))
+        precondition(store.contains("FavoriteTrackFavoriteChange("))
+        precondition(store.contains("trackID: track.id"))
+        precondition(store.contains("isFavorite: isFavorite"))
+        precondition(store.contains("albumDetail: album"))
+        precondition(store.contains("let albumDetail = try cachedFavoriteAlbumDetail(albumID: track.albumID)"))
+        precondition(store.contains("albumDetail: albumDetail"))
+        precondition(store.contains("isFavorite: false"))
+        precondition(store.contains("isFavorite: true"))
+
+        precondition(albumViewModel.contains("private var favoriteTrackChangeCancellable: AnyCancellable?"))
+        precondition(albumViewModel.contains("observeFavoriteTrackChanges()"))
+        precondition(albumViewModel.contains("libraryStore.favoriteTrackChanges.sink"))
+        precondition(albumViewModel.contains("applyFavoriteTrackChange(change)"))
+        precondition(albumViewModel.contains("guard album?.id == change.albumID else"))
+        precondition(albumViewModel.contains("favoriteTrackIDs.insert(change.trackID)"))
+        precondition(albumViewModel.contains("favoriteTrackIDs.remove(change.trackID)"))
+
+        precondition(miniPlayer.contains(".onReceive(appState.libraryStore.favoriteTrackChanges) { change in"))
+        precondition(miniPlayer.contains("applyFavoriteTrackChange(change)"))
+        precondition(miniPlayer.contains("guard currentItem?.track.id == change.trackID else"))
+        precondition(miniPlayer.contains("isCurrentTrackFavorite = change.isFavorite"))
+
+        precondition(libraryView.contains(".onReceive(appState.libraryStore.favoriteTrackChanges) { change in"))
+        precondition(libraryView.contains("applyFavoriteTrackChange(change)"))
+        precondition(libraryView.contains("guard tracks.contains(where: { $0.id == change.trackID }) else"))
+        precondition(libraryView.contains("removedFavoriteTrackIDs.remove(change.trackID)"))
+        precondition(libraryView.contains("removedFavoriteTrackIDs.insert(change.trackID)"))
+        precondition(libraryView.contains("if let albumDetail = change.albumDetail"))
+        precondition(libraryView.contains("removedFavoriteTrackAlbumDetails[change.trackID] = albumDetail"))
+        precondition(libraryView.contains("removedFavoriteTrackAlbumDetails.removeValue(forKey: change.trackID)"))
     }
 
     private static func checkMiniPlayerShowsCurrentAlbumArtwork() throws {

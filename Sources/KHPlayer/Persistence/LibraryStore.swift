@@ -1,8 +1,17 @@
+import Combine
 import Foundation
 import GRDB
 
+struct FavoriteTrackFavoriteChange: Equatable {
+    let trackID: String
+    let albumID: String
+    let isFavorite: Bool
+    let albumDetail: AlbumDetail?
+}
+
 final class LibraryStore {
     private let dbQueue: DatabaseQueue
+    let favoriteTrackChanges = PassthroughSubject<FavoriteTrackFavoriteChange, Never>()
 
     init(dbQueue: DatabaseQueue) throws {
         self.dbQueue = dbQueue
@@ -211,6 +220,14 @@ final class LibraryStore {
                 try removeCachedAlbumDetailIfUnreferenced(albumID: album.id, in: db)
             }
         }
+        favoriteTrackChanges.send(
+            FavoriteTrackFavoriteChange(
+                trackID: track.id,
+                albumID: album.id,
+                isFavorite: isFavorite,
+                albumDetail: album
+            )
+        )
     }
 
     func isTrackFavorite(trackID: String) throws -> Bool {
@@ -239,6 +256,8 @@ final class LibraryStore {
     }
 
     func removeFavoriteTrack(_ track: FavoriteTrackEntry) throws {
+        let albumDetail = try cachedFavoriteAlbumDetail(albumID: track.albumID)
+
         try dbQueue.write { db in
             try db.execute(
                 sql: "DELETE FROM favorite_tracks WHERE trackID = ?",
@@ -246,6 +265,14 @@ final class LibraryStore {
             )
             try removeCachedAlbumDetailIfUnreferenced(albumID: track.albumID, in: db)
         }
+        favoriteTrackChanges.send(
+            FavoriteTrackFavoriteChange(
+                trackID: track.id,
+                albumID: track.albumID,
+                isFavorite: false,
+                albumDetail: albumDetail
+            )
+        )
     }
 
     func restoreFavoriteTrack(_ track: FavoriteTrackEntry, albumDetail: AlbumDetail? = nil) throws {
@@ -294,6 +321,14 @@ final class LibraryStore {
                 ]
             )
         }
+        favoriteTrackChanges.send(
+            FavoriteTrackFavoriteChange(
+                trackID: track.id,
+                albumID: track.albumID,
+                isFavorite: true,
+                albumDetail: albumDetail
+            )
+        )
     }
 
     func updateFavoriteArtwork(

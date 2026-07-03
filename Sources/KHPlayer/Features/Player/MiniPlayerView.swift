@@ -118,6 +118,9 @@ private struct MiniPlayerEngineView: View {
         .onChange(of: currentItem?.track.id) { _, _ in
             refreshCurrentTrackFavorite()
         }
+        .onReceive(appState.libraryStore.favoriteTrackChanges) { change in
+            applyFavoriteTrackChange(change)
+        }
         .alert(
             "Playback Failed",
             isPresented: isPlaybackErrorPresented
@@ -277,6 +280,14 @@ private struct MiniPlayerEngineView: View {
         } catch {
             favoriteErrorMessage = error.localizedDescription
         }
+    }
+
+    private func applyFavoriteTrackChange(_ change: FavoriteTrackFavoriteChange) {
+        guard currentItem?.track.id == change.trackID else {
+            return
+        }
+
+        isCurrentTrackFavorite = change.isFavorite
     }
 
     private func toggleCurrentTrackFavorite() {

@@ -14,6 +14,7 @@ internal final class AlbumDetailViewModel: ObservableObject {
     private let client: KHClient
     private let libraryStore: LibraryStore
     private let artworkCache: ArtworkCache?
+    private var favoriteTrackChangeCancellable: AnyCancellable?
 
     internal init(
         summary: AlbumSummary,
@@ -25,6 +26,7 @@ internal final class AlbumDetailViewModel: ObservableObject {
         self.client = client
         self.libraryStore = libraryStore
         self.artworkCache = artworkCache
+        observeFavoriteTrackChanges()
     }
 
     internal func load() async {
@@ -104,6 +106,26 @@ internal final class AlbumDetailViewModel: ObservableObject {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func observeFavoriteTrackChanges() {
+        favoriteTrackChangeCancellable = libraryStore.favoriteTrackChanges.sink { [weak self] change in
+            Task { @MainActor in
+                self?.applyFavoriteTrackChange(change)
+            }
+        }
+    }
+
+    private func applyFavoriteTrackChange(_ change: FavoriteTrackFavoriteChange) {
+        guard album?.id == change.albumID else {
+            return
+        }
+
+        if change.isFavorite {
+            favoriteTrackIDs.insert(change.trackID)
+        } else {
+            favoriteTrackIDs.remove(change.trackID)
         }
     }
 

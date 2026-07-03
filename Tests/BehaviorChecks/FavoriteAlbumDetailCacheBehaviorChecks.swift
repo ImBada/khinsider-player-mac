@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import GRDB
 
 @main
@@ -8,6 +9,7 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
         try checkFavoriteAlbumEntryCanBeRestoredAfterRemoval()
         try checkFavoriteTrackKeepsAlbumDetailCacheUntilLastReferenceIsRemoved()
         try checkFavoriteTrackEntryCanBeRestoredAfterRemoval()
+        try checkFavoriteTrackChangesArePublished()
     }
 
     private static func checkFavoriteAlbumStoresFullAlbumDetail() throws {
@@ -93,6 +95,29 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
         precondition(restoredFavorite?.duration == track.duration)
         precondition(hasRestoredReference)
         precondition(restoredCachedAlbum == album)
+    }
+
+    private static func checkFavoriteTrackChangesArePublished() throws {
+        let store = try LibraryStore.inMemory()
+        let track = album.tracks[0]
+        var changes: [FavoriteTrackFavoriteChange] = []
+        let cancellable = store.favoriteTrackChanges.sink { change in
+            changes.append(change)
+        }
+
+        try store.setTrackFavorite(album: album, track: track, isFavorite: true)
+        let favorite = try store.favoriteTracks().first
+        precondition(favorite?.id == track.id)
+
+        try store.removeFavoriteTrack(favorite!)
+        try store.restoreFavoriteTrack(favorite!, albumDetail: album)
+        cancellable.cancel()
+
+        precondition(changes == [
+            FavoriteTrackFavoriteChange(trackID: track.id, albumID: album.id, isFavorite: true, albumDetail: album),
+            FavoriteTrackFavoriteChange(trackID: track.id, albumID: album.id, isFavorite: false, albumDetail: album),
+            FavoriteTrackFavoriteChange(trackID: track.id, albumID: album.id, isFavorite: true, albumDetail: album)
+        ])
     }
 
     private static let albumSummary = AlbumSummary(

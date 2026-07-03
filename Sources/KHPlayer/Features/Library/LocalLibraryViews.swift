@@ -285,6 +285,9 @@ internal struct FavoritesView: View {
         .onReceive(currentPlaybackTrackIDPublisher) { trackID in
             currentPlaybackTrackID = trackID
         }
+        .onReceive(appState.libraryStore.favoriteTrackChanges) { change in
+            applyFavoriteTrackChange(change)
+        }
     }
 
     @ViewBuilder
@@ -529,6 +532,22 @@ internal struct FavoritesView: View {
         }
         nonmutating set {
             _errorMessage.wrappedValue = newValue
+        }
+    }
+
+    private func applyFavoriteTrackChange(_ change: FavoriteTrackFavoriteChange) {
+        guard tracks.contains(where: { $0.id == change.trackID }) else {
+            return
+        }
+
+        if change.isFavorite {
+            removedFavoriteTrackIDs.remove(change.trackID)
+            removedFavoriteTrackAlbumDetails.removeValue(forKey: change.trackID)
+        } else {
+            removedFavoriteTrackIDs.insert(change.trackID)
+            if let albumDetail = change.albumDetail {
+                removedFavoriteTrackAlbumDetails[change.trackID] = albumDetail
+            }
         }
     }
 
