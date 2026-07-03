@@ -512,11 +512,16 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
     final class ScrollIndicatorInsetsView: NSView {
         var scrollerTop: CGFloat
         var contentTop: CGFloat
+        private weak var observedScrollView: NSScrollView?
 
         init(scrollerTop: CGFloat, contentTop: CGFloat) {
             self.scrollerTop = scrollerTop
             self.contentTop = contentTop
             super.init(frame: .zero)
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
 
         required init?(coder: NSCoder) {
@@ -525,6 +530,11 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+
+            if window == nil {
+                detachScrollViewFrameObserver()
+            }
+
             updateScrollIndicatorInsets()
         }
 
@@ -544,6 +554,8 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
                 return
             }
 
+            attachScrollViewFrameObserver(to: scrollView)
+
             var insets = scrollView.scrollerInsets
             insets.top = scrollerTop
             scrollView.scrollerInsets = insets
@@ -553,6 +565,39 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
             scrollView.contentInsets = contentInsets
 
             scrollView.tile()
+        }
+
+        private func attachScrollViewFrameObserver(to scrollView: NSScrollView) {
+            guard observedScrollView !== scrollView else {
+                return
+            }
+
+            detachScrollViewFrameObserver()
+            observedScrollView = scrollView
+            scrollView.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(scrollViewFrameDidChange(_:)),
+                name: NSView.frameDidChangeNotification,
+                object: scrollView
+            )
+        }
+
+        @objc private func scrollViewFrameDidChange(_ notification: Notification) {
+            updateScrollIndicatorInsets()
+        }
+
+        private func detachScrollViewFrameObserver() {
+            guard let observedScrollView else {
+                return
+            }
+
+            NotificationCenter.default.removeObserver(
+                self,
+                name: NSView.frameDidChangeNotification,
+                object: observedScrollView
+            )
+            self.observedScrollView = nil
         }
     }
 }
