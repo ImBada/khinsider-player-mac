@@ -245,6 +245,8 @@ internal struct FavoritesView: View {
     private var _hoveredFavoriteAlbumID = State<String?>(initialValue: nil)
     private var _hoveredFavoriteTrackID = State<String?>(initialValue: nil)
     private var _selectedFavoriteTrackID = State<String?>(initialValue: nil)
+    private var _removedFavoriteAlbumIDs = State<Set<String>>(initialValue: [])
+    private var _removedFavoriteAlbumDetails = State<[String: AlbumDetail]>(initialValue: [:])
     private var _removedFavoriteTrackIDs = State<Set<String>>(initialValue: [])
     private var _removedFavoriteTrackAlbumDetails = State<[String: AlbumDetail]>(initialValue: [:])
     private var _currentPlaybackTrackID = State<String?>(initialValue: nil)
@@ -316,12 +318,17 @@ internal struct FavoritesView: View {
                         FavoriteAlbumRow(
                             entry: album,
                             isHovered: hoveredFavoriteAlbumID == album.id,
+                            isFavorite: !removedFavoriteAlbumIDs.contains(album.id),
                             onHoverChanged: { isHovered in
                                 updateFavoriteAlbumHover(for: album, isHovered: isHovered)
+                            },
+                            onToggleFavoriteAlbum: {
+                                toggleFavoriteAlbum(album)
+                            },
+                            onOpen: {
+                                open(album)
                             }
-                        ) {
-                            open(album)
-                        }
+                        )
 
                         Divider()
                             .padding(.leading, FavoriteListLayout.albumSeparatorLeadingInset)
@@ -471,6 +478,24 @@ internal struct FavoritesView: View {
         _selectedFavoriteTrackID.projectedValue
     }
 
+    private var removedFavoriteAlbumIDs: Set<String> {
+        get {
+            _removedFavoriteAlbumIDs.wrappedValue
+        }
+        nonmutating set {
+            _removedFavoriteAlbumIDs.wrappedValue = newValue
+        }
+    }
+
+    private var removedFavoriteAlbumDetails: [String: AlbumDetail] {
+        get {
+            _removedFavoriteAlbumDetails.wrappedValue
+        }
+        nonmutating set {
+            _removedFavoriteAlbumDetails.wrappedValue = newValue
+        }
+    }
+
     private var removedFavoriteTrackIDs: Set<String> {
         get {
             _removedFavoriteTrackIDs.wrappedValue
@@ -517,6 +542,8 @@ internal struct FavoritesView: View {
             hoveredFavoriteAlbumID = nil
             hoveredFavoriteTrackID = nil
             _selectedFavoriteTrackID.wrappedValue = nil
+            removedFavoriteAlbumIDs = []
+            removedFavoriteAlbumDetails = [:]
             removedFavoriteTrackIDs = []
             removedFavoriteTrackAlbumDetails = [:]
         } catch {
@@ -562,6 +589,26 @@ internal struct FavoritesView: View {
             withAnimation(.easeOut(duration: FavoriteListLayout.hoverFadeDuration)) {
                 hoveredFavoriteTrackID = nil
             }
+        }
+    }
+
+    private func toggleFavoriteAlbum(_ album: FavoriteAlbumEntry) {
+        do {
+            if removedFavoriteAlbumIDs.contains(album.id) {
+                try appState.libraryStore.restoreFavoriteAlbum(
+                    album,
+                    albumDetail: removedFavoriteAlbumDetails[album.id]
+                )
+                removedFavoriteAlbumIDs.remove(album.id)
+                removedFavoriteAlbumDetails.removeValue(forKey: album.id)
+            } else {
+                let cachedAlbumDetail = try appState.libraryStore.cachedFavoriteAlbumDetail(albumID: album.id)
+                try appState.libraryStore.removeFavoriteAlbum(album)
+                removedFavoriteAlbumIDs.insert(album.id)
+                removedFavoriteAlbumDetails[album.id] = cachedAlbumDetail
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -645,41 +692,59 @@ private struct MusicListHeader: View {
 private struct FavoriteAlbumRow: View {
     let entry: FavoriteAlbumEntry
     let isHovered: Bool
+    let isFavorite: Bool
     let onHoverChanged: (Bool) -> Void
+    let onToggleFavoriteAlbum: () -> Void
     let onOpen: () -> Void
 
     var body: some View {
         FavoriteRowSurface(isHovered: isHovered, onHoverChanged: onHoverChanged) {
-            Button(action: onOpen) {
-                HStack(spacing: 12) {
-                    FavoriteArtworkView(
-                        localURL: entry.localArtworkURL,
-                        remoteURL: entry.artworkURL,
-                        size: FavoriteListLayout.albumArtworkSize
-                    )
+            HStack(spacing: 12) {
+                Button(action: onOpen) {
+                    HStack(spacing: 12) {
+                        FavoriteArtworkView(
+                            localURL: entry.localArtworkURL,
+                            remoteURL: entry.artworkURL,
+                            size: FavoriteListLayout.albumArtworkSize
+                        )
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.title)
-                            .font(.callout.weight(.semibold))
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.title)
+                                .font(.callout.weight(.semibold))
+                                .lineLimit(1)
 
-                        Text(metadata)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            Text(metadata)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .contentShape(Rectangle())
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .disabled(entry.url == nil)
+                .accessibilityLabel(entry.title)
+                .accessibilityHint("Open favorite album")
 
+                FavoriteAlbumFavoriteButton(
+                    title: entry.title,
+                    isFavorite: isFavorite,
+                    isHovered: isHovered,
+                    onToggleFavoriteAlbum: onToggleFavoriteAlbum
+                )
+
+                Button(action: onOpen) {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .disabled(entry.url == nil)
+                .accessibilityLabel("Open \(entry.title)")
             }
-            .buttonStyle(.plain)
-            .disabled(entry.url == nil)
-            .accessibilityLabel(entry.title)
-            .accessibilityHint("Open favorite album")
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -695,6 +760,27 @@ private struct FavoriteAlbumRow: View {
         }
 
         return items.isEmpty ? "Favorite Album" : items.joined(separator: " · ")
+    }
+}
+
+private struct FavoriteAlbumFavoriteButton: View {
+    let title: String
+    let isFavorite: Bool
+    let isHovered: Bool
+    let onToggleFavoriteAlbum: () -> Void
+
+    var body: some View {
+        Button(action: onToggleFavoriteAlbum) {
+            Image(systemName: isFavorite ? "star.fill" : "star")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: FavoriteListLayout.albumFavoriteColumnWidth, height: 22)
+                .opacity(isHovered ? 1 : 0)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .help(isFavorite ? "Remove Album from Favorites" : "Add Album to Favorites")
+        .accessibilityLabel(isFavorite ? "Remove \(title) from favorites" : "Add \(title) to favorites")
     }
 }
 
@@ -1484,6 +1570,7 @@ private enum FavoriteListLayout {
     static let searchFieldWidth: CGFloat = 304
     static let songActionColumnWidth: CGFloat = 28
     static let songFavoriteColumnWidth: CGFloat = 16
+    static let albumFavoriteColumnWidth: CGFloat = 24
     static let albumRowHeight: CGFloat = 54
     static let trackRowHeight: CGFloat = 42
     static let headerHeight: CGFloat = 30

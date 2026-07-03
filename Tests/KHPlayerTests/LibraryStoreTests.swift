@@ -25,6 +25,29 @@ internal struct LibraryStoreTests {
         precondition(!isFavoriteAfterRemoval)
     }
 
+    internal func favoriteAlbumEntryCanBeRestoredAfterRemoval() throws {
+        let store = try LibraryStore.inMemory()
+        let album = Self.albumDetail
+
+        try store.setAlbumFavorite(album: album, isFavorite: true)
+        let favorite = try store.favoriteAlbums().first
+        precondition(favorite?.id == album.id)
+
+        try store.removeFavoriteAlbum(favorite!)
+        try store.restoreFavoriteAlbum(favorite!, albumDetail: album)
+
+        let restoredFavorites = try store.favoriteAlbums()
+        let restoredFavorite = restoredFavorites.first
+        let restoredCachedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
+        precondition(restoredFavorites.map(\.id) == [album.id])
+        precondition(restoredFavorite?.title == album.title)
+        precondition(restoredFavorite?.url == album.url)
+        precondition(restoredFavorite?.artworkURL == album.artworkURL)
+        precondition(restoredFavorite?.year == album.year)
+        precondition(restoredFavorite?.albumType == album.albumType)
+        precondition(restoredCachedAlbum == album)
+    }
+
     internal func favoriteTrackRoundTripsTrueThenFalse() throws {
         let store = try LibraryStore.inMemory()
         let album = Self.albumDetail

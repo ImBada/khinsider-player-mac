@@ -5,6 +5,7 @@ import GRDB
 private struct FavoriteAlbumDetailCacheBehaviorChecks {
     static func main() throws {
         try checkFavoriteAlbumStoresFullAlbumDetail()
+        try checkFavoriteAlbumEntryCanBeRestoredAfterRemoval()
         try checkFavoriteTrackKeepsAlbumDetailCacheUntilLastReferenceIsRemoved()
         try checkFavoriteTrackEntryCanBeRestoredAfterRemoval()
     }
@@ -21,6 +22,32 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
 
         let removedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
         precondition(removedAlbum == nil)
+    }
+
+    private static func checkFavoriteAlbumEntryCanBeRestoredAfterRemoval() throws {
+        let store = try LibraryStore.inMemory()
+
+        try store.setAlbumFavorite(album: album, isFavorite: true)
+        let favorite = try store.favoriteAlbums().first
+        precondition(favorite?.id == album.id)
+
+        try store.removeFavoriteAlbum(favorite!)
+
+        let removedFavorites = try store.favoriteAlbums()
+        precondition(removedFavorites.isEmpty)
+
+        try store.restoreFavoriteAlbum(favorite!, albumDetail: album)
+
+        let restoredFavorites = try store.favoriteAlbums()
+        let restoredFavorite = restoredFavorites.first
+        let restoredCachedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
+        precondition(restoredFavorites.map(\.id) == [album.id])
+        precondition(restoredFavorite?.title == album.title)
+        precondition(restoredFavorite?.url == album.url)
+        precondition(restoredFavorite?.artworkURL == album.artworkURL)
+        precondition(restoredFavorite?.year == album.year)
+        precondition(restoredFavorite?.albumType == album.albumType)
+        precondition(restoredCachedAlbum == album)
     }
 
     private static func checkFavoriteTrackKeepsAlbumDetailCacheUntilLastReferenceIsRemoved() throws {

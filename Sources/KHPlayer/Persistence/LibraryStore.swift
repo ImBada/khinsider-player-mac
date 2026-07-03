@@ -88,6 +88,58 @@ final class LibraryStore {
         }
     }
 
+    func removeFavoriteAlbum(_ album: FavoriteAlbumEntry) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM favorite_albums WHERE albumID = ?",
+                arguments: [album.id]
+            )
+            try removeCachedAlbumDetailIfUnreferenced(albumID: album.id, in: db)
+        }
+    }
+
+    func restoreFavoriteAlbum(_ album: FavoriteAlbumEntry, albumDetail: AlbumDetail? = nil) throws {
+        try dbQueue.write { db in
+            if let albumDetail {
+                try upsertFavoriteAlbumDetail(albumDetail, in: db)
+            }
+
+            try db.execute(
+                sql: """
+                INSERT INTO favorite_albums (
+                    albumID,
+                    title,
+                    url,
+                    artworkURL,
+                    localArtworkURL,
+                    year,
+                    albumType,
+                    createdAt
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(albumID) DO UPDATE SET
+                    title = excluded.title,
+                    url = excluded.url,
+                    artworkURL = excluded.artworkURL,
+                    localArtworkURL = excluded.localArtworkURL,
+                    year = excluded.year,
+                    albumType = excluded.albumType,
+                    createdAt = excluded.createdAt
+                """,
+                arguments: [
+                    album.id,
+                    album.title,
+                    album.url?.absoluteString,
+                    album.artworkURL?.absoluteString,
+                    album.localArtworkURL?.absoluteString,
+                    album.year,
+                    album.albumType,
+                    Date()
+                ]
+            )
+        }
+    }
+
     func storeFavoriteAlbumDetail(_ album: AlbumDetail) throws {
         try dbQueue.write { db in
             try upsertFavoriteAlbumDetail(album, in: db)
