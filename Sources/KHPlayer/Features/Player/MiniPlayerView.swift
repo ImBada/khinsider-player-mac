@@ -45,7 +45,9 @@ private struct MiniPlayerEngineView: View {
     @ObservedObject private var engine: PlaybackEngine
 
     private var _playbackErrorMessage = State<String?>(initialValue: nil)
+    private var _favoriteErrorMessage = State<String?>(initialValue: nil)
     private var _isVolumeControlPresented = State<Bool>(initialValue: false)
+    private var _isCurrentTrackFavorite = State<Bool>(initialValue: false)
 
     init(
         appState: AppState,
@@ -83,8 +85,11 @@ private struct MiniPlayerEngineView: View {
             MiniPlayerTrackInfo(
                 trackTitle: trackTitle,
                 albumTitle: albumTitle,
+                isTrackFavorite: isCurrentTrackFavorite,
+                isFavoriteEnabled: currentItem != nil,
                 elapsedTime: engine.elapsedTime,
                 duration: engine.duration,
+                onToggleFavorite: toggleCurrentTrackFavorite,
                 onSeek: { progress in
                     engine.seek(to: progress * engine.duration)
                 }
@@ -109,6 +114,10 @@ private struct MiniPlayerEngineView: View {
                 isVolumeControlPresented = false
             }
         }
+        .onAppear(perform: refreshCurrentTrackFavorite)
+        .onChange(of: currentItem?.track.id) { _, _ in
+            refreshCurrentTrackFavorite()
+        }
         .alert(
             "Playback Failed",
             isPresented: isPlaybackErrorPresented
@@ -118,6 +127,16 @@ private struct MiniPlayerEngineView: View {
             }
         } message: {
             Text(playbackErrorMessage ?? "Playback could not advance.")
+        }
+        .alert(
+            "Favorite Update Failed",
+            isPresented: isFavoriteErrorPresented
+        ) {
+            Button("OK", role: .cancel) {
+                favoriteErrorMessage = nil
+            }
+        } message: {
+            Text(favoriteErrorMessage ?? "Favorite could not be updated.")
         }
     }
 
@@ -142,6 +161,15 @@ private struct MiniPlayerEngineView: View {
         }
     }
 
+    private var favoriteErrorMessage: String? {
+        get {
+            _favoriteErrorMessage.wrappedValue
+        }
+        nonmutating set {
+            _favoriteErrorMessage.wrappedValue = newValue
+        }
+    }
+
     private var isPlaybackErrorPresented: Binding<Bool> {
         Binding {
             playbackErrorMessage != nil
@@ -149,6 +177,25 @@ private struct MiniPlayerEngineView: View {
             if !isPresented {
                 playbackErrorMessage = nil
             }
+        }
+    }
+
+    private var isFavoriteErrorPresented: Binding<Bool> {
+        Binding {
+            favoriteErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented {
+                favoriteErrorMessage = nil
+            }
+        }
+    }
+
+    private var isCurrentTrackFavorite: Bool {
+        get {
+            _isCurrentTrackFavorite.wrappedValue
+        }
+        nonmutating set {
+            _isCurrentTrackFavorite.wrappedValue = newValue
         }
     }
 
@@ -217,6 +264,39 @@ private struct MiniPlayerEngineView: View {
 
         onAlbumArtworkPressed(album)
     }
+
+    private func refreshCurrentTrackFavorite() {
+        guard let item = currentItem else {
+            isCurrentTrackFavorite = false
+            return
+        }
+
+        do {
+            isCurrentTrackFavorite = try appState.libraryStore.isTrackFavorite(trackID: item.track.id)
+            favoriteErrorMessage = nil
+        } catch {
+            favoriteErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func toggleCurrentTrackFavorite() {
+        guard let item = currentItem else {
+            return
+        }
+
+        do {
+            let nextValue = !isCurrentTrackFavorite
+            try appState.libraryStore.setTrackFavorite(
+                album: item.album,
+                track: item.track,
+                isFavorite: nextValue
+            )
+            isCurrentTrackFavorite = nextValue
+            favoriteErrorMessage = nil
+        } catch {
+            favoriteErrorMessage = error.localizedDescription
+        }
+    }
 }
 
 private struct MiniPlayerArtworkView: View {
@@ -263,24 +343,34 @@ private struct MiniPlayerArtworkView: View {
 private struct MiniPlayerTrackInfo: View {
     let trackTitle: String
     let albumTitle: String?
+    let isTrackFavorite: Bool
+    let isFavoriteEnabled: Bool
     let elapsedTime: TimeInterval
     let duration: TimeInterval
+    let onToggleFavorite: () -> Void
     let onSeek: (Double) -> Void
 
     @Namespace private var playbackFaderAnimation
     private var _isPlaybackFaderHovered = State<Bool>(initialValue: false)
+    private var _isTrackInfoHovered = State<Bool>(initialValue: false)
 
     fileprivate init(
         trackTitle: String,
         albumTitle: String?,
+        isTrackFavorite: Bool,
+        isFavoriteEnabled: Bool,
         elapsedTime: TimeInterval,
         duration: TimeInterval,
+        onToggleFavorite: @escaping () -> Void,
         onSeek: @escaping (Double) -> Void
     ) {
         self.trackTitle = trackTitle
         self.albumTitle = albumTitle
+        self.isTrackFavorite = isTrackFavorite
+        self.isFavoriteEnabled = isFavoriteEnabled
         self.elapsedTime = elapsedTime
         self.duration = duration
+        self.onToggleFavorite = onToggleFavorite
         self.onSeek = onSeek
     }
 
@@ -298,14 +388,28 @@ private struct MiniPlayerTrackInfo: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: MiniPlayerLayout.trackInfoHeight, alignment: .bottomLeading)
+        .contentShape(Rectangle())
+        .onHover { isHovered in
+            isTrackInfoHovered = isHovered
+        }
     }
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(trackTitle)
-                .font(.callout.weight(.semibold))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            HStack(alignment: .firstTextBaseline, spacing: MiniPlayerLayout.favoriteTitleSpacing) {
+                Text(trackTitle)
+                    .font(.callout.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                MiniPlayerFavoriteButton(
+                    title: trackTitle,
+                    isFavorite: isTrackFavorite,
+                    isVisible: isTrackInfoHovered,
+                    isEnabled: isFavoriteEnabled,
+                    onToggleFavorite: onToggleFavorite
+                )
+            }
 
             Text(albumTitle ?? " ")
                 .font(.caption)
@@ -314,7 +418,6 @@ private struct MiniPlayerTrackInfo: View {
                 .truncationMode(.tail)
                 .accessibilityHidden(albumTitle == nil)
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var compactPlaybackTimeline: some View {
@@ -381,6 +484,52 @@ private struct MiniPlayerTrackInfo: View {
         }
         nonmutating set {
             _isPlaybackFaderHovered.wrappedValue = newValue
+        }
+    }
+
+    private var isTrackInfoHovered: Bool {
+        get {
+            _isTrackInfoHovered.wrappedValue
+        }
+        nonmutating set {
+            _isTrackInfoHovered.wrappedValue = newValue
+        }
+    }
+}
+
+private struct MiniPlayerFavoriteButton: View {
+    let title: String
+    let isFavorite: Bool
+    let isVisible: Bool
+    let isEnabled: Bool
+    let onToggleFavorite: () -> Void
+
+    private var _isButtonHovered = State<Bool>(initialValue: false)
+
+    var body: some View {
+        Button(action: onToggleFavorite) {
+            Image(systemName: isFavorite ? "star.fill" : "star")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isButtonHovered ? Color.primary : Color(nsColor: .disabledControlTextColor))
+                .frame(width: MiniPlayerLayout.favoriteButtonSize, height: MiniPlayerLayout.favoriteButtonSize)
+                .opacity(isVisible && isEnabled ? 1 : 0)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .contentShape(Rectangle())
+        .onHover { isHovered in
+            isButtonHovered = isHovered
+        }
+        .help(isFavorite ? "Remove Song from Favorites" : "Add Song to Favorites")
+        .accessibilityLabel(isFavorite ? "Remove \(title) from favorites" : "Add \(title) to favorites")
+    }
+
+    private var isButtonHovered: Bool {
+        get {
+            _isButtonHovered.wrappedValue
+        }
+        nonmutating set {
+            _isButtonHovered.wrappedValue = newValue
         }
     }
 }
@@ -749,6 +898,8 @@ private enum MiniPlayerLayout {
     static let secondaryButtonIconSize: CGFloat = 15
     static let artworkSize: CGFloat = 34
     static let trackInfoHeight: CGFloat = 39
+    static let favoriteTitleSpacing: CGFloat = 4
+    static let favoriteButtonSize: CGFloat = 18
     static let playbackCompactFaderHeight: CGFloat = 3
     static let playbackExpandedFaderHeight: CGFloat = 10
     static let playbackTimeLabelWidth: CGFloat = 38

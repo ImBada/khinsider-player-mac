@@ -30,6 +30,7 @@ struct DesignBehaviorChecks {
         try checkAlbumAndTrackFavoriteControlsMatchMusicBehavior()
         try checkMiniPlayerVolumeControlMatchesMusicBehavior()
         try checkMiniPlayerPlaybackFaderMatchesMusicBehavior()
+        try checkMiniPlayerTrackInfoCanToggleCurrentTrackFavorite()
         try checkMiniPlayerShowsCurrentAlbumArtwork()
         try checkMiniPlayerArtworkNavigatesToCurrentAlbum()
         try checkSidebarStaysVisible()
@@ -907,6 +908,38 @@ struct DesignBehaviorChecks {
         precondition(miniPlayer.contains("engine.seek(to: progress * engine.duration)"))
         precondition(!miniPlayer.contains(".frame(maxWidth: .infinity, minHeight: MiniPlayerLayout.trackInfoHeight, alignment: .center)\n        .contentShape(Rectangle())\n        .onHover"))
         precondition(!miniPlayer.contains("Slider(value: playback"))
+    }
+
+    private static func checkMiniPlayerTrackInfoCanToggleCurrentTrackFavorite() throws {
+        let miniPlayer = try sourceFile("Sources/KHPlayer/Features/Player/MiniPlayerView.swift")
+        let store = try sourceFile("Sources/KHPlayer/Persistence/LibraryStore.swift")
+
+        precondition(miniPlayer.contains("private var _isCurrentTrackFavorite = State<Bool>(initialValue: false)"))
+        precondition(miniPlayer.contains("private var _favoriteErrorMessage = State<String?>(initialValue: nil)"))
+        precondition(miniPlayer.contains("isTrackFavorite: isCurrentTrackFavorite"))
+        precondition(miniPlayer.contains("onToggleFavorite: toggleCurrentTrackFavorite"))
+        precondition(miniPlayer.contains(".onAppear(perform: refreshCurrentTrackFavorite)"))
+        precondition(miniPlayer.contains(".onChange(of: currentItem?.track.id)"))
+        precondition(miniPlayer.contains("try appState.libraryStore.isTrackFavorite(trackID: item.track.id)"))
+        precondition(miniPlayer.contains("try appState.libraryStore.setTrackFavorite("))
+        precondition(miniPlayer.contains("album: item.album,"))
+        precondition(miniPlayer.contains("track: item.track,"))
+        precondition(miniPlayer.contains("isFavorite: nextValue"))
+        precondition(miniPlayer.contains("private struct MiniPlayerFavoriteButton: View"))
+        precondition(miniPlayer.contains("HStack(alignment: .firstTextBaseline, spacing: MiniPlayerLayout.favoriteTitleSpacing)"))
+        precondition(miniPlayer.contains("Image(systemName: isFavorite ? \"star.fill\" : \"star\")"))
+        precondition(miniPlayer.contains("private var _isTrackInfoHovered = State<Bool>(initialValue: false)"))
+        precondition(miniPlayer.contains("isVisible: isTrackInfoHovered"))
+        precondition(miniPlayer.contains("private var _isButtonHovered = State<Bool>(initialValue: false)"))
+        precondition(miniPlayer.contains(".opacity(isVisible && isEnabled ? 1 : 0)"))
+        precondition(miniPlayer.contains(".foregroundStyle(isButtonHovered ? Color.primary : Color(nsColor: .disabledControlTextColor))"))
+        precondition(miniPlayer.contains(".contentShape(Rectangle())\n        .onHover { isHovered in\n            isTrackInfoHovered = isHovered\n        }"))
+        precondition(miniPlayer.contains(".onHover { isHovered in\n            isButtonHovered = isHovered"))
+        precondition(!miniPlayer.contains(".accessibilityElement(children: .combine)"))
+        precondition(miniPlayer.contains("static let favoriteTitleSpacing: CGFloat = 4"))
+        precondition(miniPlayer.contains("static let favoriteButtonSize: CGFloat = 18"))
+        precondition(store.contains("func setTrackFavorite(album: AlbumDetail, track: Track, isFavorite: Bool) throws"))
+        precondition(store.contains("func isTrackFavorite(trackID: String) throws -> Bool"))
     }
 
     private static func checkMiniPlayerShowsCurrentAlbumArtwork() throws {
