@@ -186,6 +186,64 @@ final class LibraryStore {
         }
     }
 
+    func removeFavoriteTrack(_ track: FavoriteTrackEntry) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM favorite_tracks WHERE trackID = ?",
+                arguments: [track.id]
+            )
+            try removeCachedAlbumDetailIfUnreferenced(albumID: track.albumID, in: db)
+        }
+    }
+
+    func restoreFavoriteTrack(_ track: FavoriteTrackEntry, albumDetail: AlbumDetail? = nil) throws {
+        try dbQueue.write { db in
+            if let albumDetail {
+                try upsertFavoriteAlbumDetail(albumDetail, in: db)
+            }
+
+            try db.execute(
+                sql: """
+                INSERT INTO favorite_tracks (
+                    trackID,
+                    albumID,
+                    title,
+                    albumTitle,
+                    detailURL,
+                    albumURL,
+                    artworkURL,
+                    localArtworkURL,
+                    duration,
+                    createdAt
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(trackID) DO UPDATE SET
+                    albumID = excluded.albumID,
+                    title = excluded.title,
+                    albumTitle = excluded.albumTitle,
+                    detailURL = excluded.detailURL,
+                    albumURL = excluded.albumURL,
+                    artworkURL = excluded.artworkURL,
+                    localArtworkURL = excluded.localArtworkURL,
+                    duration = excluded.duration,
+                    createdAt = excluded.createdAt
+                """,
+                arguments: [
+                    track.id,
+                    track.albumID,
+                    track.title,
+                    track.albumTitle,
+                    track.detailURL?.absoluteString,
+                    track.albumURL?.absoluteString,
+                    track.artworkURL?.absoluteString,
+                    track.localArtworkURL?.absoluteString,
+                    track.duration,
+                    Date()
+                ]
+            )
+        }
+    }
+
     func updateFavoriteArtwork(
         albumID: String,
         remoteArtworkURL: URL?,

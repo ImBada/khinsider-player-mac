@@ -6,6 +6,7 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
     static func main() throws {
         try checkFavoriteAlbumStoresFullAlbumDetail()
         try checkFavoriteTrackKeepsAlbumDetailCacheUntilLastReferenceIsRemoved()
+        try checkFavoriteTrackEntryCanBeRestoredAfterRemoval()
     }
 
     private static func checkFavoriteAlbumStoresFullAlbumDetail() throws {
@@ -37,6 +38,34 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
 
         let removedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
         precondition(removedAlbum == nil)
+    }
+
+    private static func checkFavoriteTrackEntryCanBeRestoredAfterRemoval() throws {
+        let store = try LibraryStore.inMemory()
+        let track = album.tracks[0]
+
+        try store.setTrackFavorite(album: album, track: track, isFavorite: true)
+        let favorite = try store.favoriteTracks().first
+        precondition(favorite?.id == track.id)
+
+        try store.removeFavoriteTrack(favorite!)
+
+        let removedFavorites = try store.favoriteTracks()
+        precondition(removedFavorites.isEmpty)
+
+        try store.restoreFavoriteTrack(favorite!, albumDetail: album)
+
+        let restoredFavorites = try store.favoriteTracks()
+        let restoredFavorite = restoredFavorites.first
+        let hasRestoredReference = try store.hasFavoriteReference(albumID: album.id)
+        let restoredCachedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
+        precondition(restoredFavorites.map(\.id) == [track.id])
+        precondition(restoredFavorite?.title == track.title)
+        precondition(restoredFavorite?.albumTitle == album.title)
+        precondition(restoredFavorite?.artworkURL == album.artworkURL)
+        precondition(restoredFavorite?.duration == track.duration)
+        precondition(hasRestoredReference)
+        precondition(restoredCachedAlbum == album)
     }
 
     private static let albumSummary = AlbumSummary(

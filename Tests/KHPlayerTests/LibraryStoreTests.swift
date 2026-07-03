@@ -47,6 +47,48 @@ internal struct LibraryStoreTests {
         precondition(!isFavoriteAfterRemoval)
     }
 
+    internal func favoriteTrackEntryCanBeRemovedWithoutAlbumDetail() throws {
+        let store = try LibraryStore.inMemory()
+        let album = Self.albumDetail
+        let track = album.tracks[0]
+
+        try store.setTrackFavorite(album: album, track: track, isFavorite: true)
+        let favorite = try store.favoriteTracks().first
+        precondition(favorite?.id == track.id)
+
+        try store.removeFavoriteTrack(favorite!)
+
+        let remainingFavorites = try store.favoriteTracks()
+        let hasReference = try store.hasFavoriteReference(albumID: album.id)
+        precondition(remainingFavorites.isEmpty)
+        precondition(!hasReference)
+    }
+
+    internal func favoriteTrackEntryCanBeRestoredAfterRemoval() throws {
+        let store = try LibraryStore.inMemory()
+        let album = Self.albumDetail
+        let track = album.tracks[0]
+
+        try store.setTrackFavorite(album: album, track: track, isFavorite: true)
+        let favorite = try store.favoriteTracks().first
+        precondition(favorite?.id == track.id)
+
+        try store.removeFavoriteTrack(favorite!)
+        try store.restoreFavoriteTrack(favorite!, albumDetail: album)
+
+        let restoredFavorites = try store.favoriteTracks()
+        let restoredFavorite = restoredFavorites.first
+        let hasReference = try store.hasFavoriteReference(albumID: album.id)
+        let restoredCachedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
+        precondition(restoredFavorites.map(\.id) == [track.id])
+        precondition(restoredFavorite?.title == track.title)
+        precondition(restoredFavorite?.albumTitle == album.title)
+        precondition(restoredFavorite?.artworkURL == album.artworkURL)
+        precondition(restoredFavorite?.duration == track.duration)
+        precondition(hasReference)
+        precondition(restoredCachedAlbum == album)
+    }
+
     internal func favoriteArtworkCacheMetadataUpdatesAllReferences() throws {
         let store = try LibraryStore.inMemory()
         let album = Self.albumDetail

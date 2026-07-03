@@ -245,6 +245,8 @@ internal struct FavoritesView: View {
     private var _hoveredFavoriteAlbumID = State<String?>(initialValue: nil)
     private var _hoveredFavoriteTrackID = State<String?>(initialValue: nil)
     private var _selectedFavoriteTrackID = State<String?>(initialValue: nil)
+    private var _removedFavoriteTrackIDs = State<Set<String>>(initialValue: [])
+    private var _removedFavoriteTrackAlbumDetails = State<[String: AlbumDetail]>(initialValue: [:])
     private var _currentPlaybackTrackID = State<String?>(initialValue: nil)
     private var _favoriteSearchText = State<String>(initialValue: "")
     private var _isLoading = State<Bool>(initialValue: true)
@@ -343,12 +345,14 @@ internal struct FavoritesView: View {
         } else {
             FavoriteSongsTable(
                 tracks: filteredTracks,
+                removedFavoriteTrackIDs: removedFavoriteTrackIDs,
                 hoveredTrackID: hoveredFavoriteTrackID,
                 selectedTrackID: selectedFavoriteTrackIDBinding,
                 currentPlaybackTrackID: currentPlaybackTrackID,
                 onHoverTrackChanged: { track, isHovered in
                     updateFavoriteTrackHover(for: track, isHovered: isHovered)
                 },
+                onToggleFavoriteTrack: toggleFavoriteTrack,
                 onPlayTrack: { track in
                     onPlayTrack(track, filteredTracks)
                 }
@@ -467,6 +471,24 @@ internal struct FavoritesView: View {
         _selectedFavoriteTrackID.projectedValue
     }
 
+    private var removedFavoriteTrackIDs: Set<String> {
+        get {
+            _removedFavoriteTrackIDs.wrappedValue
+        }
+        nonmutating set {
+            _removedFavoriteTrackIDs.wrappedValue = newValue
+        }
+    }
+
+    private var removedFavoriteTrackAlbumDetails: [String: AlbumDetail] {
+        get {
+            _removedFavoriteTrackAlbumDetails.wrappedValue
+        }
+        nonmutating set {
+            _removedFavoriteTrackAlbumDetails.wrappedValue = newValue
+        }
+    }
+
     private var isLoading: Bool {
         get {
             _isLoading.wrappedValue
@@ -495,6 +517,8 @@ internal struct FavoritesView: View {
             hoveredFavoriteAlbumID = nil
             hoveredFavoriteTrackID = nil
             _selectedFavoriteTrackID.wrappedValue = nil
+            removedFavoriteTrackIDs = []
+            removedFavoriteTrackAlbumDetails = [:]
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -538,6 +562,26 @@ internal struct FavoritesView: View {
             withAnimation(.easeOut(duration: FavoriteListLayout.hoverFadeDuration)) {
                 hoveredFavoriteTrackID = nil
             }
+        }
+    }
+
+    private func toggleFavoriteTrack(_ track: FavoriteTrackEntry) {
+        do {
+            if removedFavoriteTrackIDs.contains(track.id) {
+                try appState.libraryStore.restoreFavoriteTrack(
+                    track,
+                    albumDetail: removedFavoriteTrackAlbumDetails[track.id]
+                )
+                removedFavoriteTrackIDs.remove(track.id)
+                removedFavoriteTrackAlbumDetails.removeValue(forKey: track.id)
+            } else {
+                let cachedAlbumDetail = try appState.libraryStore.cachedFavoriteAlbumDetail(albumID: track.albumID)
+                try appState.libraryStore.removeFavoriteTrack(track)
+                removedFavoriteTrackIDs.insert(track.id)
+                removedFavoriteTrackAlbumDetails[track.id] = cachedAlbumDetail
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
@@ -854,25 +898,31 @@ private struct HistorySongTextCell: View {
 
 private struct FavoriteSongsTable: View {
     let tracks: [FavoriteTrackEntry]
+    let removedFavoriteTrackIDs: Set<String>
     let hoveredTrackID: String?
     let selectedTrackID: Binding<String?>
     let currentPlaybackTrackID: String?
     let onHoverTrackChanged: (FavoriteTrackEntry, Bool) -> Void
+    let onToggleFavoriteTrack: (FavoriteTrackEntry) -> Void
     let onPlayTrack: (FavoriteTrackEntry) -> Void
 
     init(
         tracks: [FavoriteTrackEntry],
+        removedFavoriteTrackIDs: Set<String>,
         hoveredTrackID: String?,
         selectedTrackID: Binding<String?>,
         currentPlaybackTrackID: String?,
         onHoverTrackChanged: @escaping (FavoriteTrackEntry, Bool) -> Void,
+        onToggleFavoriteTrack: @escaping (FavoriteTrackEntry) -> Void,
         onPlayTrack: @escaping (FavoriteTrackEntry) -> Void
     ) {
         self.tracks = tracks
+        self.removedFavoriteTrackIDs = removedFavoriteTrackIDs
         self.hoveredTrackID = hoveredTrackID
         self.selectedTrackID = selectedTrackID
         self.currentPlaybackTrackID = currentPlaybackTrackID
         self.onHoverTrackChanged = onHoverTrackChanged
+        self.onToggleFavoriteTrack = onToggleFavoriteTrack
         self.onPlayTrack = onPlayTrack
     }
 
@@ -890,6 +940,19 @@ private struct FavoriteSongsTable: View {
                 )
             }
             .width(min: 280, ideal: 440)
+
+            TableColumn("☆") { entry in
+                FavoriteSongFavoriteCell(
+                    entry: entry,
+                    isFavorite: !removedFavoriteTrackIDs.contains(entry.id),
+                    isHovered: hoveredTrackID == entry.id,
+                    onHoverChanged: { isHovered in
+                        onHoverTrackChanged(entry, isHovered)
+                    },
+                    onToggleFavoriteTrack: onToggleFavoriteTrack
+                )
+            }
+            .width(min: FavoriteListLayout.songFavoriteColumnWidth, ideal: FavoriteListLayout.songFavoriteColumnWidth, max: FavoriteListLayout.songFavoriteColumnWidth)
 
             TableColumn("Album") { entry in
                 FavoriteSongTextCell(
@@ -933,6 +996,31 @@ private struct FavoriteSongsTable: View {
                 onPlayTrack: onPlayTrack
             )
         }
+    }
+}
+
+private struct FavoriteSongFavoriteCell: View {
+    let entry: FavoriteTrackEntry
+    let isFavorite: Bool
+    let isHovered: Bool
+    let onHoverChanged: (Bool) -> Void
+    let onToggleFavoriteTrack: (FavoriteTrackEntry) -> Void
+
+    var body: some View {
+        Button {
+            onToggleFavoriteTrack(entry)
+        } label: {
+            Image(systemName: isFavorite ? "star.fill" : "star")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(maxWidth: .infinity, minHeight: 22, alignment: .center)
+                .opacity(isHovered ? 1 : 0)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .help(isFavorite ? "Remove Song from Favorites" : "Add Song to Favorites")
+        .accessibilityLabel(isFavorite ? "Remove \(entry.title) from favorites" : "Add \(entry.title) to favorites")
+        .onHover(perform: onHoverChanged)
     }
 }
 
@@ -1395,6 +1483,7 @@ private enum FavoriteListLayout {
     static let trackArtworkSize: CGFloat = 34
     static let searchFieldWidth: CGFloat = 304
     static let songActionColumnWidth: CGFloat = 28
+    static let songFavoriteColumnWidth: CGFloat = 16
     static let albumRowHeight: CGFloat = 54
     static let trackRowHeight: CGFloat = 42
     static let headerHeight: CGFloat = 30
