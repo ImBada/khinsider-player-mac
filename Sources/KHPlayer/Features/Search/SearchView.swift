@@ -181,8 +181,7 @@ internal struct SearchView: View {
                     .frame(height: SearchChromeMetrics.contentTopInset)
                     .background {
                         SearchScrollIndicatorInsetsSetter(
-                            scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset,
-                            contentTop: SearchChromeMetrics.contentTopInset
+                            scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset
                         )
                     }
                     .accessibilityHidden(true)
@@ -256,8 +255,7 @@ internal struct SearchView: View {
             .frame(height: SearchChromeMetrics.contentTopInset)
             .background {
                 SearchScrollIndicatorInsetsSetter(
-                    scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset,
-                    contentTop: SearchChromeMetrics.contentTopInset
+                    scrollerTop: SearchChromeMetrics.scrollIndicatorTopInset
                 )
             }
             .listRowInsets(EdgeInsets())
@@ -328,26 +326,23 @@ internal enum HomeSectionLayout {
 
 private struct SearchScrollIndicatorInsetsSetter: NSViewRepresentable {
     let scrollerTop: CGFloat
-    let contentTop: CGFloat
 
     func makeNSView(context: Context) -> ScrollIndicatorInsetsView {
-        ScrollIndicatorInsetsView(scrollerTop: scrollerTop, contentTop: contentTop)
+        ScrollIndicatorInsetsView(scrollerTop: scrollerTop)
     }
 
     func updateNSView(_ nsView: ScrollIndicatorInsetsView, context: Context) {
         nsView.scrollerTop = scrollerTop
-        nsView.contentTop = contentTop
         nsView.updateScrollIndicatorInsets()
     }
 
     final class ScrollIndicatorInsetsView: NSView {
         var scrollerTop: CGFloat
-        var contentTop: CGFloat
         private weak var observedScrollView: NSScrollView?
+        private var isApplyingInsets = false
 
-        init(scrollerTop: CGFloat, contentTop: CGFloat) {
+        init(scrollerTop: CGFloat) {
             self.scrollerTop = scrollerTop
-            self.contentTop = contentTop
             super.init(frame: .zero)
         }
 
@@ -375,27 +370,32 @@ private struct SearchScrollIndicatorInsetsSetter: NSViewRepresentable {
         }
 
         func updateScrollIndicatorInsets() {
-            DispatchQueue.main.async { [weak self] in
-                self?.updateScrollIndicatorInsetsNow()
+            if !applyScrollIndicatorInsetNow() {
+                DispatchQueue.main.async { [weak self] in
+                    self?.applyScrollIndicatorInsetNow()
+                }
             }
         }
 
-        private func updateScrollIndicatorInsetsNow() {
+        @discardableResult
+        private func applyScrollIndicatorInsetNow() -> Bool {
+            guard !isApplyingInsets else {
+                return true
+            }
+
             guard let searchScrollView = enclosingScrollView else {
-                return
+                return false
+            }
+
+            isApplyingInsets = true
+            defer {
+                isApplyingInsets = false
             }
 
             attachScrollViewFrameObserver(to: searchScrollView)
-
-            var scrollerInsets = searchScrollView.scrollerInsets
-            scrollerInsets.top = scrollerTop
-            searchScrollView.scrollerInsets = scrollerInsets
-
-            var contentInsets = searchScrollView.contentInsets
-            contentInsets.top = contentTop
-            searchScrollView.contentInsets = contentInsets
-
+            TopInsetScroller.install(on: searchScrollView, topInset: scrollerTop)
             searchScrollView.tile()
+            return true
         }
 
         private func attachScrollViewFrameObserver(to searchScrollView: NSScrollView) {
@@ -415,7 +415,7 @@ private struct SearchScrollIndicatorInsetsSetter: NSViewRepresentable {
         }
 
         @objc private func scrollViewFrameDidChange(_ notification: Notification) {
-            updateScrollIndicatorInsets()
+            applyScrollIndicatorInsetNow()
         }
 
         private func detachScrollViewFrameObserver() {

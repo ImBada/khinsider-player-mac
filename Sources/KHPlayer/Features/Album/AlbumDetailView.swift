@@ -118,8 +118,7 @@ internal struct AlbumDetailView: View {
             .frame(height: AlbumDetailLayout.scrollContentTopInset)
             .background {
                 ScrollIndicatorInsetsSetter(
-                    scrollerTop: AlbumDetailLayout.scrollIndicatorTopInset,
-                    contentTop: AlbumDetailLayout.scrollContentTopInset
+                    scrollerTop: AlbumDetailLayout.scrollIndicatorTopInset
                 )
             }
     }
@@ -497,26 +496,23 @@ private struct ScrollOffsetTrackingModifier: ViewModifier {
 @MainActor
 private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
     let scrollerTop: CGFloat
-    let contentTop: CGFloat
 
     func makeNSView(context: Context) -> ScrollIndicatorInsetsView {
-        ScrollIndicatorInsetsView(scrollerTop: scrollerTop, contentTop: contentTop)
+        ScrollIndicatorInsetsView(scrollerTop: scrollerTop)
     }
 
     func updateNSView(_ nsView: ScrollIndicatorInsetsView, context: Context) {
         nsView.scrollerTop = scrollerTop
-        nsView.contentTop = contentTop
         nsView.updateScrollIndicatorInsets()
     }
 
     final class ScrollIndicatorInsetsView: NSView {
         var scrollerTop: CGFloat
-        var contentTop: CGFloat
         private weak var observedScrollView: NSScrollView?
+        private var isApplyingInsets = false
 
-        init(scrollerTop: CGFloat, contentTop: CGFloat) {
+        init(scrollerTop: CGFloat) {
             self.scrollerTop = scrollerTop
-            self.contentTop = contentTop
             super.init(frame: .zero)
         }
 
@@ -544,27 +540,32 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
         }
 
         func updateScrollIndicatorInsets() {
-            DispatchQueue.main.async { [weak self] in
-                self?.updateScrollIndicatorInsetsNow()
+            if !applyScrollIndicatorInsetNow() {
+                DispatchQueue.main.async { [weak self] in
+                    self?.applyScrollIndicatorInsetNow()
+                }
             }
         }
 
-        private func updateScrollIndicatorInsetsNow() {
+        @discardableResult
+        private func applyScrollIndicatorInsetNow() -> Bool {
+            guard !isApplyingInsets else {
+                return true
+            }
+
             guard let scrollView = enclosingScrollView else {
-                return
+                return false
+            }
+
+            isApplyingInsets = true
+            defer {
+                isApplyingInsets = false
             }
 
             attachScrollViewFrameObserver(to: scrollView)
-
-            var insets = scrollView.scrollerInsets
-            insets.top = scrollerTop
-            scrollView.scrollerInsets = insets
-
-            var contentInsets = scrollView.contentInsets
-            contentInsets.top = contentTop
-            scrollView.contentInsets = contentInsets
-
+            TopInsetScroller.install(on: scrollView, topInset: scrollerTop)
             scrollView.tile()
+            return true
         }
 
         private func attachScrollViewFrameObserver(to scrollView: NSScrollView) {
@@ -584,7 +585,7 @@ private struct ScrollIndicatorInsetsSetter: NSViewRepresentable {
         }
 
         @objc private func scrollViewFrameDidChange(_ notification: Notification) {
-            updateScrollIndicatorInsets()
+            applyScrollIndicatorInsetNow()
         }
 
         private func detachScrollViewFrameObserver() {
