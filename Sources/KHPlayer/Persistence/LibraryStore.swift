@@ -518,6 +518,17 @@ final class LibraryStore {
     }
 
     private func upsertFavoriteAlbumDetail(_ album: AlbumDetail, in db: Database) throws {
+        if let existingDetailJSON = try String.fetchOne(
+            db,
+            sql: "SELECT detailJSON FROM favorite_album_details WHERE albumID = ?",
+            arguments: [album.id]
+        ) {
+            let existingAlbum = try Self.decodeFavoriteAlbumDetail(from: existingDetailJSON)
+            guard Self.shouldReplaceCachedAlbumDetail(existing: existingAlbum, with: album) else {
+                return
+            }
+        }
+
         try db.execute(
             sql: """
             INSERT INTO favorite_album_details (
@@ -536,6 +547,24 @@ final class LibraryStore {
                 Date()
             ]
         )
+    }
+
+    private static func shouldReplaceCachedAlbumDetail(
+        existing: AlbumDetail,
+        with album: AlbumDetail
+    ) -> Bool {
+        guard existing.id == album.id else {
+            return true
+        }
+
+        let existingTrackIDs = Set(existing.tracks.map(\.id))
+        let newTrackIDs = Set(album.tracks.map(\.id))
+        if existingTrackIDs.count > newTrackIDs.count,
+           newTrackIDs.isSubset(of: existingTrackIDs) {
+            return false
+        }
+
+        return true
     }
 
     private func removeCachedAlbumDetailIfUnreferenced(albumID: String, in db: Database) throws {

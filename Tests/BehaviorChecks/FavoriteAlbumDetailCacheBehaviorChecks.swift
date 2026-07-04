@@ -6,6 +6,7 @@ import GRDB
 private struct FavoriteAlbumDetailCacheBehaviorChecks {
     static func main() throws {
         try checkFavoriteAlbumStoresFullAlbumDetail()
+        try checkSingleTrackAlbumDetailDoesNotReplaceFullFavoriteCache()
         try checkFavoriteAlbumEntryCanBeRestoredAfterRemoval()
         try checkFavoriteTrackKeepsAlbumDetailCacheUntilLastReferenceIsRemoved()
         try checkFavoriteTrackEntryCanBeRestoredAfterRemoval()
@@ -24,6 +25,18 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
 
         let removedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
         precondition(removedAlbum == nil)
+    }
+
+    private static func checkSingleTrackAlbumDetailDoesNotReplaceFullFavoriteCache() throws {
+        let store = try LibraryStore.inMemory()
+        let firstTrack = album.tracks[0]
+        let singleTrackAlbum = album.withTracks([firstTrack])
+
+        try store.setTrackFavorite(album: album, track: firstTrack, isFavorite: true)
+        try store.setTrackFavorite(album: singleTrackAlbum, track: firstTrack, isFavorite: true)
+
+        let cachedAlbum = try store.cachedFavoriteAlbumDetail(albumID: album.id)
+        precondition(cachedAlbum == album)
     }
 
     private static func checkFavoriteAlbumEntryCanBeRestoredAfterRemoval() throws {
@@ -140,9 +153,9 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
         year: albumSummary.year,
         publisher: "ATLUS GAME MUSIC",
         albumType: albumSummary.albumType,
-        fileCount: 1,
-        totalDuration: 128,
-        totalMP3Size: "3 MB",
+        fileCount: 2,
+        totalDuration: 248,
+        totalMP3Size: "6 MB",
         dateAdded: "2022-01-01",
         artworkURL: albumSummary.artworkURL,
         description: "A test album cached from a favorite action.",
@@ -156,12 +169,42 @@ private struct FavoriteAlbumDetailCacheBehaviorChecks {
                 detailURL: URL(string: "https://downloads.khinsider.com/game-soundtracks/album/persona-vinyl-soundtrack-2022/1")!,
                 duration: 128,
                 mp3Size: "3 MB"
+            ),
+            Track(
+                id: "persona-vinyl-soundtrack-2022-2",
+                albumID: albumSummary.id,
+                discNumber: nil,
+                number: 2,
+                title: "School Days",
+                detailURL: URL(string: "https://downloads.khinsider.com/game-soundtracks/album/persona-vinyl-soundtrack-2022/2")!,
+                duration: 120,
+                mp3Size: "3 MB"
             )
         ]
     )
 }
 
 private extension AlbumDetail {
+    func withTracks(_ tracks: [Track]) -> AlbumDetail {
+        AlbumDetail(
+            id: id,
+            title: title,
+            url: url,
+            alternativeTitles: alternativeTitles,
+            platforms: platforms,
+            year: year,
+            publisher: publisher,
+            albumType: albumType,
+            fileCount: fileCount,
+            totalDuration: totalDuration,
+            totalMP3Size: totalMP3Size,
+            dateAdded: dateAdded,
+            artworkURL: artworkURL,
+            description: description,
+            tracks: tracks
+        )
+    }
+
     var summary: AlbumSummary {
         AlbumSummary(
             id: id,
